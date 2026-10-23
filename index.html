@@ -57,6 +57,7 @@
   <p><span class="k">WASD</span> move &nbsp; <span class="k">Mouse</span> look &nbsp; <span class="k">Shift</span> sprint (loud) &nbsp; <span class="k">C</span> crouch (quiet)<br>
      <span class="k">F</span> flashlight &nbsp; <span class="k">Q</span> body cam &nbsp; <span class="k">Scroll</span> zoom (cam on) &nbsp; <span class="k">Click</span> photo &nbsp; <span class="k">E</span> interact / hold</p>
   <p>Fog is light. Lit lamps show you the park, and its silhouettes. The dogs never touch you. They only move when you aren't looking. Wear headphones.</p>
+  <p id="padnote" style="display:none;color:#ffd35a">CONTROLLER: Left stick move &nbsp; Right stick look &nbsp; A interact (hold) &nbsp; X flashlight &nbsp; Y body cam &nbsp; RT photo &nbsp; LB sprint &nbsp; B crouch &nbsp; D-pad zoom &nbsp; &mdash; press A to begin</p>
   <p id="musicnote" style="color:#6a7"></p>
   <p><label id="songbtn" style="color:#ffd35a;cursor:pointer;border:1px solid #ffd35a;padding:6px 12px;display:inline-block">[ load a song for the car radio ]<input type="file" id="songfile" accept="audio/*" multiple hidden></label> <span id="songlist" style="color:#6a7"></span></p>
   <p style="margin-top:22px;color:#fff">[ click to begin ]</p>
@@ -204,6 +205,7 @@ function losClear(a,b){
   const dx=b.x-a.x, dy=b.y-a.y, dz=b.z-a.z;
   for(let i=0;i<blockBoxes.length;i++){
     const bb=blockBoxes[i]; let t0=0,t1=1, ok=true;
+    if(b.x>=bb.minX&&b.x<=bb.maxX&&b.y>=bb.minY&&b.y<=bb.maxY&&b.z>=bb.minZ&&b.z<=bb.maxZ) continue;   // the thing being photographed can't block its own photo (carousel fix)
     // x
     if(Math.abs(dx)<1e-9){ if(a.x<bb.minX||a.x>bb.maxX) continue; }
     else { let u=(bb.minX-a.x)/dx, v=(bb.maxX-a.x)/dx; if(u>v){const t=u;u=v;v=t;} t0=Math.max(t0,u); t1=Math.min(t1,v); if(t0>t1) continue; }
@@ -1441,7 +1443,8 @@ addEventListener('wheel',e=>{ if(!started||!camOn) return; zoomTarget=clamp(zoom
 addEventListener('mousedown',e=>{ if(locked&&e.button===0) tryPhoto(); });
 $('start').addEventListener('click',()=>{
   initAudio(); if(AC&&AC.state==='suspended') AC.resume();
-  canvas.requestPointerLock(); $('start').style.display='none'; started=true; setOrder();
+  try{ const r=canvas.requestPointerLock(); if(r&&r.catch) r.catch(()=>{}); }catch(e){}
+  $('start').style.display='none'; started=true; setOrder();
   if(WORLD.car) musicAt(WORLD.car.position.x,1,WORLD.car.position.z);
   later(5,()=>dale('You in? Gate\'s open. Plaza is straight ahead. Booth first.',6));
 });
@@ -1478,20 +1481,48 @@ function setup(){
 
 // ---------- update ----------
 let lastTrailT=0;
+
+// ---------- Xbox / gamepad controls ----------
+try{ navigator.gamepadInputEmulation='gamepad'; }catch(e){}   // Xbox Edge: give us the real controller, not a mouse cursor
+const pad={fw:0,st:0,prev:[],on:false};
+const dz=v=>Math.abs(v)<0.18?0:Math.sign(v)*(Math.abs(v)-0.18)/0.82;
+const fakeKey=code=>dispatchEvent(new KeyboardEvent('keydown',{code}));
+function pollPad(dt){
+  const gp=[...(navigator.getGamepads?navigator.getGamepads():[])].find(g=>g&&g.connected); pad.fw=pad.st=0;
+  if(!gp){ return; }
+  const b=i=>!!(gp.buttons[i]&&gp.buttons[i].pressed), hit=i=>b(i)&&!pad.prev[i];
+  if(!pad.on){ pad.on=true; const n=$('padnote'); if(n) n.style.display='block'; }
+  if(!started){ if(hit(0)||hit(9)) $('start').click(); }
+  else if(dead){ if(hit(0)||hit(9)) fakeKey('KeyR'); }
+  else if(!ended){
+    pad.fw=-dz(gp.axes[1]||0); pad.st=dz(gp.axes[0]||0);
+    const lx=dz(gp.axes[2]||0), ly=dz(gp.axes[3]||0), rate=2.8/Math.sqrt(zoom);
+    player.yaw-=lx*Math.abs(lx)*rate*dt; player.pitch=clamp(player.pitch-ly*Math.abs(ly)*rate*dt,-1.45,1.45);
+    if(hit(0)) keys.KeyE=true; else if(!b(0)&&pad.prev[0]) keys.KeyE=false;     // A: interact (hold for the long ones)
+    keys.ShiftLeft=b(10)||b(4);                                                    // L3 or LB: sprint
+    if(hit(1)) keys.KeyC=!keys.KeyC;                                               // B: crouch on/off
+    if(hit(2)) fakeKey('KeyF');                                                    // X: flashlight
+    if(hit(3)||hit(6)) fakeKey('KeyQ');                                            // Y or LT: body cam
+    if(hit(7)||hit(5)) tryPhoto();                                                 // RT or RB: photo
+    if(camOn&&(hit(12)||hit(13))){ zoomTarget=clamp(zoomTarget*(hit(12)?1.2:1/1.2),1,7); blip(500+zoomTarget*120,0.03,'square',0.04); }   // d-pad: zoom
+  }
+  pad.prev=gp.buttons.map(x=>x.pressed);
+}
 function update(dt){
+  pollPad(dt);
   tNow+=dt;
   for(let i=events.length-1;i>=0;i--){ if(tNow>=events[i].t){ const f=events[i].fn; events.splice(i,1); f(); } }
   if(!started){ return; }
   player.hurtT=Math.max(0,player.hurtT-dt);
   // --- movement ---
   if(!ended&&!dead&&player.stun<=0){
-    const fw=(keys.KeyW?1:0)-(keys.KeyS?1:0), st=(keys.KeyD?1:0)-(keys.KeyA?1:0);
+    const fw=clamp((keys.KeyW?1:0)-(keys.KeyS?1:0)+pad.fw,-1,1), st=clamp((keys.KeyD?1:0)-(keys.KeyA?1:0)+pad.st,-1,1);
     player.crouch=!!keys.KeyC;
-    const sprint=!!keys.ShiftLeft&&!player.crouch&&fw>0;
+    const sprint=!!keys.ShiftLeft&&!player.crouch&&fw>0.3;
     const sp=player.crouch?1.5:(sprint?5.4:3.1);
     const moving=fw||st;
     if(moving){
-      const l=Math.hypot(fw,st), sx=Math.sin(player.yaw), cz=Math.cos(player.yaw);
+      const l=Math.max(1,Math.hypot(fw,st)), sx=Math.sin(player.yaw), cz=Math.cos(player.yaw);
       player.pos.x+=(-sx*fw+cz*st)/l*sp*dt; player.pos.z+=(-cz*fw-sx*st)/l*sp*dt;
       player.stepT+=dt; const iv=sprint?0.3:(player.crouch?0.8:0.5);
       if(player.stepT>iv){player.stepT=0; if(!player.crouch||Math.random()<.4) step(sprint);}
