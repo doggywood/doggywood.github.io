@@ -1,0 +1,14 @@
+<!doctype html><html><head><meta charset="utf-8"><meta name="robots" content="noindex"><title>Controller test</title>
+<style>body{background:#111;color:#dfe;font:22px monospace;padding:30px}b{color:#fd5}</style></head><body>
+<h2>DOGGYWOOD controller test</h2><p>Press buttons and move both sticks.</p><pre id="o">waiting...</pre>
+<script>
+try{ navigator.gamepadInputEmulation='gamepad'; }catch(e){}
+let mm=0, clicks=0, keys=[];
+addEventListener('mousemove',()=>mm++); addEventListener('click',()=>clicks++); addEventListener('keydown',e=>{keys.push(e.key);keys=keys.slice(-6);});
+function tick(){ const g=[...(navigator.getGamepads?navigator.getGamepads():[])].filter(Boolean);
+  let t='browser: '+navigator.userAgent.slice(-60)+'\nemulation setting: '+(navigator.gamepadInputEmulation===undefined?'NOT SUPPORTED':navigator.gamepadInputEmulation)+'\ncontrollers seen: '+g.length+'\n';
+  g.forEach(p=>{ t+='\n'+p.id.slice(0,40)+'\n sticks: '+p.axes.map(a=>a.toFixed(2)).join('  ')+'\n buttons down: '+p.buttons.map((b,i)=>b.pressed?i:null).filter(v=>v!==null).join(',')+'\n'; });
+  t+='\nmouse moves: '+mm+'   clicks: '+clicks+'   keys: '+keys.join(' ');
+  document.getElementById('o').textContent=t; requestAnimationFrame(tick); }
+tick();
+</script></body></html>

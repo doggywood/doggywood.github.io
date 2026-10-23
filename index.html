@@ -1453,6 +1453,7 @@ $('start').addEventListener('click',()=>{
 document.addEventListener('pointerlockchange',()=>{locked=document.pointerLockElement===canvas;});
 addEventListener('mousemove',e=>{
   if(!locked||dead||ended) return;
+  if(performance.now()/1000-pad.lastUse<1) return;   // controller in use: ignore mouse-cursor emulation
   const sens=0.0022/Math.sqrt(zoom);
   player.yaw-=e.movementX*sens; player.pitch-=e.movementY*sens; player.pitch=clamp(player.pitch,-1.45,1.45);
 });
@@ -1485,8 +1486,10 @@ function setup(){
 let lastTrailT=0;
 
 // ---------- Xbox / gamepad controls ----------
-// Xbox Edge: the controller is a mouse cursor on the start screen (so A is a real click and full screen is allowed), then game controls once started
-const pad={fw:0,st:0,prev:[],on:false};
+// Xbox Edge: ask for the real controller instead of the mouse cursor, as early as possible
+try{ navigator.gamepadInputEmulation='gamepad'; }catch(e){}
+addEventListener('gamepadconnected',()=>{ try{ navigator.gamepadInputEmulation='gamepad'; }catch(e){} });
+const pad={fw:0,st:0,prev:[],on:false,lastUse:-9};
 const dz=v=>Math.abs(v)<0.18?0:Math.sign(v)*(Math.abs(v)-0.18)/0.82;
 const fakeKey=code=>dispatchEvent(new KeyboardEvent('keydown',{code}));
 function pollPad(dt){
@@ -1508,6 +1511,7 @@ function pollPad(dt){
     if(hit(7)||hit(5)) tryPhoto();                                                 // RT or RB: photo
     if(camOn&&(hit(12)||hit(13))){ zoomTarget=clamp(zoomTarget*(hit(12)?1.2:1/1.2),1,7); blip(500+zoomTarget*120,0.03,'square',0.04); }   // d-pad: zoom
   }
+  if(gp.axes.some(a=>Math.abs(a)>0.25)||gp.buttons.some(x=>x.pressed)) pad.lastUse=performance.now()/1000;
   pad.prev=gp.buttons.map(x=>x.pressed);
 }
 function update(dt){
