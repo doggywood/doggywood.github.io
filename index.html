@@ -1385,7 +1385,7 @@ function sigilBroken(s){
   noiseBurst(1.5,120,0.7,0.3); blip(55,1.4,'sawtooth',0.3);
   killLamps(0.18); boxWarp=Math.min(1,sigilsBroken*0.3);
   setMusic({distort:Math.min(0.9,0.3+sigilsBroken*0.2)}); activateDogs(2); dogRate=Math.max(0.5,1-sigilsBroken*0.15);
-  if(s.id==='carousel'){ mons.horses.forEach(h=>h.despawn()); later(1.2,()=>rideRescue('carousel',mons.horses[0],s)); }
+  if(s.id==='carousel'){ mons.horses.forEach(h=>h.despawn()); later(1.2,()=>rideRescue('carousel',mons.tyke,s)); }
   if(s.id==='fun'){ mons.mirror.despawn(); later(1.2,()=>rideRescue('fun',mons.mirror,s)); }
   if(s.id==='pool'){ mons.lifeguard.despawn(); later(1.2,()=>rideRescue('pool',mons.lifeguard,s)); }
   if(!sextonSpawned&&sigilsBroken>=1){ sextonSpawned=true; later(6,()=>{ spawnSexton(); say('You hear someone humming. It is not coming from the speakers.',5); }); }
@@ -1649,8 +1649,7 @@ function zoneSpawns(){
   if(stage<3||ended||dead) return;
   const px=player.pos.x, pz=player.pos.z, C=WORLD.C;
   const sg=id=>WORLD.sigils.find(s=>s.id===id);
-  if(!horsesSpawned&&!sg('carousel').broken&&Math.hypot(px-C.carousel.x,pz-C.carousel.z)<34){ horsesSpawned=true; stinger(0.5);
-    mons.horses.forEach((h,i)=>{ const a=i/3*TAU+0.5; h.spawn(C.carousel.x+Math.cos(a)*10,C.carousel.z+Math.sin(a)*10,1.5); h.noclipT=2; }); say('The carousel horses are no longer on their poles.',4); }
+  // (the carousel horses stay on their poles)
   if(!lifeguardSpawned&&!sg('pool').broken&&Math.hypot(px-C.pool.x,pz-C.pool.z)<28){ lifeguardSpawned=true; mons.lifeguard.noclipT=6; mons.lifeguard.spawn(C.pool.x,C.pool.z,0.55,2.4); stinger(0.5); say('The water is moving. Nothing is swimming in it.',4); }
   if(!mirrorSpawned&&!sg('fun').broken&&px<-49&&px>-77&&pz<-58&&pz>-78){ mirrorSpawned=true; mons.mirror.spawn(-65.5,-75,0); stinger(0.6); say('In every mirror, you are not alone.',4); }
   if(!kidsSpawned&&Math.hypot(px-C.station.x,pz-C.station.z)<34){ kidsSpawned=true; mons.kids[0].spawn(C.station.x-6,C.station.z+8,0); mons.kids[1].spawn(C.station.x+8,C.station.z+9,0); say('Phones glow in the dark. Three of them. They are filming.',4); }
