@@ -73,9 +73,9 @@
   <h1>DOGGYWOOD</h1>
   <p>You are Liam, a field inspector for Solomon LLC. Doggywood Park closed fifteen years ago and is finally for sale. The sellers won't say much, and they want the inspection done tonight. Check that everything still works, document it, and leave.</p>
   <p><span class="k">WASD</span> move &nbsp; <span class="k">Mouse</span> look &nbsp; <span class="k">Shift</span> sprint (loud) &nbsp; <span class="k">C</span> crouch (quiet)<br>
-     <span class="k">F</span> flashlight &nbsp; <span class="k">Q</span> body cam &nbsp; <span class="k">Scroll</span> zoom (cam on) &nbsp; <span class="k">Click</span> photo &nbsp; <span class="k">E</span> interact / hold</p>
+     <span class="k">Q</span> night-vision camera &nbsp; <span class="k">Scroll</span> zoom (cam on) &nbsp; <span class="k">Click</span> photo &nbsp; <span class="k">E</span> interact / hold</p>
   <p>Fog is light. Lit lamps show you the park, and its silhouettes. The dog never touches you. Some things here only move when you aren't looking. Wear headphones.</p>
-  <p id="padnote" style="display:none;color:#ffd35a">CONTROLLER: Left stick move &nbsp; Right stick look &nbsp; A interact (hold) &nbsp; X flashlight &nbsp; Y body cam &nbsp; RT photo &nbsp; LB sprint &nbsp; B crouch &nbsp; D-pad zoom &nbsp; &mdash; press A to begin</p>
+  <p id="padnote" style="display:none;color:#ffd35a">CONTROLLER: Left stick move &nbsp; Right stick look &nbsp; A interact (hold) &nbsp; Y night-vision camera &nbsp; RT photo &nbsp; LB sprint &nbsp; B crouch &nbsp; D-pad zoom &nbsp; &mdash; press A to begin</p>
   <p id="musicnote" style="color:#6a7"></p>
   <p style="margin-top:22px;color:#fff">[ click to begin ]</p>
 </div>
@@ -1346,7 +1346,7 @@ function updateTaker(dt){
 </script>
 <script>"use strict";
 // ================= DOGGYWOOD game =================
-let stage=0, tNow=0, started=false, locked=false, gameMin=22*60+10, camOn=false, flashOn=true, battery=100;
+let stage=0, tNow=0, started=false, locked=false, gameMin=22*60+10, camOn=false, flashOn=false, battery=100;   // no flashlight in this game
 let zoomTarget=1, photosTaken=0, sigilsBroken=0, powered=false, holdT=0, hbT=0, subTimer=null;
 const keys={}, events=[]; const later=(s,fn)=>events.push({t:tNow+s,fn});
 const seenDogSet=new Set();
@@ -1538,7 +1538,6 @@ addEventListener('keydown',e=>{
   if(paused){ menuKey(e.code); return; }
   if((e.code==='Escape'||e.code==='KeyP')&&started&&!dead&&!ended){ openMenu(); return; }
   if(!started||dead||ended) return;
-  if(e.code==='KeyF'){ flashOn=!flashOn; blip(1400,0.04,'square',0.08); }
   if(e.code==='KeyQ'){ camOn=!camOn&&battery>1; blip(camOn?1900:700,0.05,'square',0.08); applyCam(); }
 });
 addEventListener('keyup',e=>{keys[e.code]=false;});
@@ -1646,7 +1645,6 @@ function pollPad(dt){
     if(hit(0)) keys.KeyE=true; else if(!b(0)&&pad.prev[0]) keys.KeyE=false;     // A: interact (hold for the long ones)
     keys.ShiftLeft=b(10)||b(4);                                                    // L3 or LB: sprint
     if(hit(1)) keys.KeyC=!keys.KeyC;                                               // B: crouch on/off
-    if(hit(2)) fakeKey('KeyF');                                                    // X: flashlight
     if(hit(3)||hit(6)) fakeKey('KeyQ');                                            // Y or LT: body cam
     if(hit(7)) tryPhoto();                                                         // RT: photo (RB is pause)
     { const up=b(12), dn=b(13), step=d=>{ zoomTarget=clamp(zoomTarget*(d>0?1.2:1/1.2),1,7); blip(500+zoomTarget*120,0.03,'square',0.04); };   // d-pad: zoom, hold to keep zooming (3 steps a second)
@@ -1692,7 +1690,7 @@ function update(dt){
     if(camOn&&monsterInFrame()) want=zoom<1.4?300:zoom<2.2?150:zoom<3.5?84:zoom<5?52:36;   // you can't study them through the lens
     POST.rows=want; }
   camera.updateMatrixWorld(true); updateListener();
-  flash.visible=flashOn&&!ended; flash.color.set(camOn?0xb8ffc8:0xfff0cc); flash.angle=0.46/Math.max(1,zoom*0.6);
+  flash.visible=false; flash.color.set(camOn?0xb8ffc8:0xfff0cc); flash.angle=0.46/Math.max(1,zoom*0.6);
   // trail for the Sexton
   lastTrailT+=dt; if(lastTrailT>0.5){ lastTrailT=0; player.trail.push(player.pos.clone()); if(player.trail.length>160) player.trail.shift(); }
 
@@ -2060,8 +2058,8 @@ function drawMenu(){
   $('mitems').innerHTML=MENU.map((m,i)=>'<div class="it'+(i===menuSel?' sel':'')+'" data-i="'+i+'">'+m.t()+'</div>').join('');
   $('mhint').textContent=pad.on?'D-pad: move / change   A: select   B or RB: resume':'Mouse or arrow keys: move / change   Enter: select   Esc: resume';
   $('mhelp').innerHTML=pad.on
-    ?'Left stick: move &nbsp; Right stick: look<br>A: interact (hold) &nbsp; X: flashlight<br>Y: body cam &nbsp; RT: photo &nbsp; D-pad: zoom<br>LB: sprint (loud) &nbsp; B: crouch (quiet) &nbsp; RB: pause'
-    :'WASD: move &nbsp; Mouse: look<br>E: interact (hold) &nbsp; F: flashlight<br>Q: body cam &nbsp; Click: photo &nbsp; Scroll: zoom<br>Shift: sprint (loud) &nbsp; C: crouch (quiet)';
+    ?'Left stick: move &nbsp; Right stick: look<br>A: interact (hold)<br>Y: night-vision camera &nbsp; RT: photo &nbsp; D-pad: zoom<br>LB: sprint (loud) &nbsp; B: crouch (quiet) &nbsp; RB: pause'
+    :'WASD: move &nbsp; Mouse: look<br>E: interact (hold)<br>Q: night-vision camera &nbsp; Click: photo &nbsp; Scroll: zoom<br>Shift: sprint (loud) &nbsp; C: crouch (quiet)';
 }
 function openMenu(){ if(paused||!started||dead||ended) return; paused=true; menuSel=0; $('mhelp').style.display='none'; drawMenu(); $('menu').style.display='flex'; try{document.exitPointerLock();}catch(e){} if(AC&&AC.state==='running') AC.suspend(); }
 function closeMenu(){ if(!paused) return; paused=false; $('menu').style.display='none'; if(AC&&AC.state==='suspended') AC.resume(); try{ const r=canvas.requestPointerLock(); if(r&&r.catch) r.catch(()=>{}); }catch(e){} }
@@ -2302,7 +2300,7 @@ function introParked(){
   const I=INTRO; I.phase='trunk'; I.x=0; I.z=112;
   WORLD.car.position.set(0,0,112); WORLD.car.rotation.y=Math.PI; musicAt(0,1,112); music.vol=0.55/3; applyMusic(); $('titlecard').style.opacity=0;
   if(CAB.g) CAB.g.visible=false; if(CAB.hl) CAB.hl.intensity=1.2;
-  player.pos.x=0.3; player.pos.z=116.9; player.yaw=0.05; player.pitch=-0.28; flashOn=true;
+  player.pos.x=0.3; player.pos.z=116.9; player.yaw=0.05; player.pitch=-0.28;
   thump(0.4); noiseBurst(0.12,1600,0.2,1);                        // door shuts
   setTimeout(()=>{ $('fade').style.opacity=0; },150);
 }
@@ -2310,7 +2308,7 @@ function grabGear(){
   if(INTRO.phase!=='trunk') return; INTRO.phase='done';
   let k=0; const open=setInterval(()=>{ k++; if(CAB.lid) CAB.lid.rotation.x=Math.min(0.85,k*0.09); if(k>=11) clearInterval(open); },30);
   if(CAB.hole) CAB.hole.visible=true; if(CAB.bag) CAB.bag.visible=true; noiseBurst(0.35,700,0.3,0.6); setTimeout(()=>{ noiseBurst(0.5,2600,0.18,2); if(CAB.bag) CAB.bag.visible=false; thump(0.3); },500);   // unzip, lift the bag
-  say('Body cam. Flashlight. Work order.',3);
+  say('Night-vision camera. Work order.',3);
   $('order').style.display=''; setOrder();
   later(1,checkpoint); later(2.6,()=>liam('Okay. Doggywood Park. In and out.'));
   later(6,()=>dale('Liam? You in? Gate\'s open. Plaza\'s straight ahead. Start with the ticket booth.',6));
