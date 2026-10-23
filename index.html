@@ -1088,7 +1088,7 @@ function placeDog(d,x,y,z,o){
   let rel=Math.atan2(camera.position.x-x,camera.position.z-z)-d.g.rotation.y; while(rel>Math.PI)rel-=TAU; while(rel<-Math.PI)rel+=TAU;
   d.head.rotation.y=clamp(rel,-1.2,1.2); d.head.rotation.z=(Math.random()<.5?-1:1)*rand(0.1,0.32); d.head.rotation.x=rand(-0.05,0.15);
   d.g.visible=true; d.unseen=0;
-  if(Math.hypot(x-camera.position.x,z-camera.position.z)<42) jingle(d.g.position);
+  if(!o.silent&&Math.hypot(x-camera.position.x,z-camera.position.z)<42) jingle(d.g.position);
 }
 function dogSeen(d){ return d.g.visible&&seenObj(d.g.position,3.2); }
 function nearestDogDist(){ let b=1e9; dogs.forEach(d=>{ if(d.g.visible) b=Math.min(b,Math.hypot(d.g.position.x-player.pos.x,d.g.position.z-player.pos.z)); }); return b; }
@@ -1130,9 +1130,10 @@ function guidePlace(d,target,pointTarget){
 }
 function updateGuideDog(d,dt,target,decoy){
   if(!d.active||!target) return;
-  if(dogSeen(d)){ d.unseen=0; return; }
+  if(dogSeen(d)){ if(d.behind){ d.behind=false; stinger(0.7); thump(0.6); } d.unseen=0; return; }
   d.unseen+=dt;
   if(d.unseen<(d.fake?7:5)) return;
+  if(!d.fake&&tryBehind(d,decoy||target)){ d.unseen=0; return; }
   if(guidePlace(d,target,decoy)) d.unseen=0; else d.unseen=3;
 }
 
@@ -1886,6 +1887,20 @@ function teenC(t,pos){ teenVoice('teenC',t,pos); }
 const HOLLOW={'Hello? Is somebody there?':'teenA','Please. It hurts.':'teenB','Dale? Dale is that you?':'teenC','Don\'t look at me.':'teenB','Are you filming?':'teenA','We\'re live. Say hi.':'teenC'};
 function hollowSay(m,text){ const who=HOLLOW[text]||'teenA', pos={x:m.g.position.x,y:1.4,z:m.g.position.z};
   teenVoice(who,text,pos,0.82); if(Math.random()<0.35) setTimeout(()=>teenVoice(who==='teenB'?'teenB':'teenA',who==='teenB'?'Hehe... heh heh.':'Heh... heh heh heh.',pos,0.8),2600); }
+
+// ---------- the dog, right behind you, pointing the way ----------
+let behindCD=20;
+setInterval(()=>{ behindCD=Math.max(0,behindCD-0.5); },500);
+function tryBehind(d,target){
+  if(behindCD>0||Math.random()>0.33||dead||ended||!target) return false;
+  const bx=player.pos.x+Math.sin(player.yaw)*2.6, bz=player.pos.z+Math.cos(player.yaw)*2.6;   // directly behind you
+  if(pointBlocked(bx,bz)||seenPoint(_t.set(bx,1.6,bz))) return false;
+  placeDog(d,bx,0,bz,{silent:true});                     // faces you
+  const rel=Math.atan2(target.x-bx,target.z-bz)-d.g.rotation.y;
+  d.armR.rotation.order='YXZ'; d.armR.rotation.set(-Math.PI/2,rel,0);   // arm out, pointing where you need to go
+  d.head.rotation.set(0.12,0,0.28);
+  d.behind=true; behindCD=45; return true;
+}
 </script>
 </body>
 </html>
