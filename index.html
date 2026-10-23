@@ -529,64 +529,91 @@ function makeHorse(walker){
 }
 
 // ---------- THE TYKE ----------
+// ---------- shared bits for the creatures: limbs between two points, eyes that catch your light ----------
+function bone(parent,a,b,r0,r1,mat){ const dx=b[0]-a[0], dy=b[1]-a[1], dz=b[2]-a[2], L=Math.hypot(dx,dy,dz)||0.01;
+  const m=new THREE.Mesh(CG(r1,r0,L,6),mat); m.position.set((a[0]+b[0])/2,(a[1]+b[1])/2,(a[2]+b[2])/2);
+  m.quaternion.setFromUnitVectors(new THREE.Vector3(0,1,0),new THREE.Vector3(dx/L,dy/L,dz/L)); parent.add(m); return m; }
+function knuckle(parent,p,r,mat){ return mesh(SG(r,6,5),mat,p[0],p[1],p[2],parent); }
+function eyeShine(parent,x,y,z,sc,col){ const e=new THREE.Sprite(new THREE.SpriteMaterial({map:glowTex,color:col||0xe8f0e0,transparent:true,depthWrite:false,blending:THREE.AdditiveBlending,fog:false,opacity:0.85}));
+  e.scale.setScalar(sc||0.22); e.position.set(x,y,z); parent.add(e); return e; }
 function makeTyke(){
-  const g=new THREE.Group(); const skin=lam({color:0xbdb5a2});
-  mesh(BG(0.4,0.34,1.1),skin,0,0.75,0,g);
-  [[-0.22,0.45],[0.22,0.45],[-0.22,-0.45],[0.22,-0.45]].forEach((p,i)=>{ mesh(BG(0.03,0.3,0.03),lam({color:0x8c836f}),p[0],0.75,p[1],g); });
-  mesh(SG(0.24,8,6),skin,0,0.8,0.78,g); mesh(BG(0.22,0.32,0.06),bas({color:0x300000}),0,0.74,1.0,g);
-  [-0.07,0.07].forEach(x=>mesh(SG(0.05,4,3),bas({color:0x000000}),x,0.88,0.98,g));
+  // the knuckle crawler: a body like a starved dog's, four arms with too many joints, its face upside down
+  const g=new THREE.Group(); const skin=lam({color:0xa39b8a}), dark=lam({color:0x3a342c}), mouth=bas({color:0x090202});
+  const torso=mesh(CG(0.2,0.26,1.15,7),skin,0,0.85,0,g,Math.PI/2,0,0);
+  for(let i=0;i<7;i++) knuckle(g,[0,1.0,-0.45+i*0.15],0.07,skin);                                   // spine showing through
+  [-1,1].forEach(sd=>{ for(let i=0;i<5;i++) bone(g,[sd*0.06,1.0,-0.3+i*0.14],[sd*0.26,0.75,-0.28+i*0.14],0.025,0.02,skin); });   // ribs
+  const head=new THREE.Group(); head.position.set(0,0.72,0.78); head.rotation.z=Math.PI; g.add(head);    // upside down
+  mesh(SG(0.24,8,6),skin,0,0,0,head).scale.set(0.9,1.15,1);
+  mesh(BG(0.26,0.06,0.05),mouth,0,0.12,0.2,head); [-0.09,0.09].forEach(x=>{ mesh(SG(0.055,5,4),bas({color:0x000000}),x,-0.06,0.19,head); eyeShine(head,x,-0.06,0.24,0.16); });
+  for(let i=0;i<6;i++) mesh(BG(0.022,0.05,0.02),lam({color:0xd8cfb4}),-0.1+i*0.04,0.15,0.21,head);
   g.userData.limbs=[];
-  [[-0.32,0.45],[0.32,0.45],[-0.32,-0.45],[0.32,-0.45]].forEach(p=>{
-    const l=new THREE.Group(); l.position.set(p[0],0.75,p[1]);
-    mesh(BG(0.07,0.8,0.07),skin,0,-0.4,0,l); mesh(BG(0.07,0.7,0.07),skin,0,-0.8,0.12,l,0.5,0,0); mesh(SG(0.07,4,3),skin,0,-0.45,0.02,l);
-    g.add(l); g.userData.limbs.push(l);
-  });
+  [[-1,0.45],[1,0.45],[-1,-0.45],[1,-0.45]].forEach(([sd,z])=>{
+    const l=new THREE.Group(); l.position.set(sd*0.24,0.85,z); g.add(l);
+    const k1=[sd*0.35,0.45,0.05], k2=[sd*0.55,0.1,0.12], f=[sd*0.62,-0.82,0.2];
+    bone(l,[0,0,0],k1,0.06,0.05,skin); knuckle(l,k1,0.075,skin); bone(l,k1,k2,0.05,0.045,skin); knuckle(l,k2,0.07,skin); bone(l,k2,f,0.045,0.03,skin);
+    for(let k=0;k<4;k++) bone(l,f,[f[0]+(k-1.5)*0.05,f[1]-0.05,f[2]+0.16],0.012,0.008,dark);
+    g.userData.limbs.push(l); });
   return g;
 }
 
 // ---------- THE LIFEGUARD ----------
 function makeLifeguard(){
-  const g=new THREE.Group(); const skin=lam({color:0x8c9aa0}), red=lam({color:0xaa1a1a});
-  mesh(BG(0.95,1.0,0.55),skin,0,1.4,0,g); mesh(BG(0.96,0.5,0.56),red,0,0.75,0,g);
-  [-0.22,0.22].forEach(x=>mesh(BG(0.28,0.8,0.3),skin,x,0.35,0,g));
-  const head=new THREE.Group(); head.position.y=2.2; head.rotation.z=0.3; g.add(head);
-  mesh(SG(0.3,8,6),skin,0,0,0,head); mesh(SG(0.32,8,5),bas({color:0x070b0b}),0,0.14,-0.04,head);
-  mesh(BG(0.22,0.5,0.1),bas({color:0x0b0000}),0,-0.2,0.25,head);
-  [-0.12,0.12].forEach(x=>mesh(SG(0.06,4,3),bas({color:0xe0e8e0}),x,0.05,0.27,head));
-  const armL=new THREE.Group(), armR=new THREE.Group(); armL.position.set(-0.6,1.8,0); armR.position.set(0.6,1.8,0);
-  [armL,armR].forEach(a=>{ mesh(BG(0.18,1.5,0.18),skin,0,-0.75,0,a); g.add(a); }); armL.rotation.z=0.1; armR.rotation.z=-0.1;
-  mesh(BG(0.1,0.1,0.1),lam({color:0xdddddd}),0.1,1.9,0.3,g);
+  // the drowned lifeguard: too tall, waterlogged, hair hanging over the face, arms down past its knees
+  const g=new THREE.Group(); const skin=lam({color:0x6f8088}), pale=lam({color:0x9aa8ad}), red=lam({color:0x7a1414}), hair=bas({color:0x050808});
+  [-0.17,0.17].forEach(x=>{ bone(g,[x,0,0.05],[x*1.1,0.95,0],0.07,0.09,skin); bone(g,[x*1.1,0.95,0],[x,1.55,0],0.09,0.11,skin); knuckle(g,[x*1.1,0.95,0],0.1,skin); });
+  mesh(CG(0.3,0.26,0.42,8),red,0,1.62,0,g);                                                        // faded trunks
+  for(let i=0;i<5;i++) mesh(BG(0.08,0.2,0.02),red,-0.24+i*0.12,1.38,0.2,g,0.1,0,(i%2?0.2:-0.15));   // torn hem
+  const chest=mesh(CG(0.34,0.28,1.0,8),skin,0,2.3,0,g); chest.scale.z=0.7;
+  [-1,1].forEach(sd=>{ for(let i=0;i<4;i++) bone(g,[sd*0.05,2.55-i*0.13,0.2],[sd*0.3,2.45-i*0.13,0.12],0.018,0.015,pale); });
+  const head=new THREE.Group(); head.position.set(0.05,3.0,0.05); head.rotation.set(0.35,0,0.45); g.add(head);   // head lolled to one side
+  mesh(SG(0.27,8,6),skin,0,0,0,head).scale.set(0.9,1.2,0.95);
+  for(let i=0;i<14;i++){ const x=-0.24+i*0.037; mesh(BG(0.03,0.7+Math.abs(Math.sin(i*1.7))*0.35,0.02),hair,x,-0.18,0.25-Math.abs(x)*0.25,head); }   // wet hair over the face
+  mesh(BG(0.14,0.3,0.05),bas({color:0x000000}),0,-0.22,0.27,head); eyeShine(head,0.07,0.04,0.3,0.14);            // one eye between the strands
+  const cord=bone(g,[-0.15,2.85,0.15],[0.02,2.35,0.28],0.008,0.008,bas({color:0xb02020})); mesh(BG(0.06,0.12,0.04),lam({color:0xcfcfcf}),0.02,2.3,0.29,g);   // whistle
+  const armL=new THREE.Group(), armR=new THREE.Group(); armL.position.set(-0.42,2.72,0); armR.position.set(0.42,2.72,0);
+  [armL,armR].forEach((a,k)=>{ const sd=k?1:-1; bone(a,[0,0,0],[sd*0.08,-1.05,0.05],0.06,0.05,skin); knuckle(a,[sd*0.08,-1.05,0.05],0.065,skin);
+    bone(a,[sd*0.08,-1.05,0.05],[sd*0.1,-2.1,0.15],0.05,0.035,skin);
+    for(let f=0;f<4;f++) bone(a,[sd*0.1,-2.1,0.15],[sd*0.1+(f-1.5)*0.04,-2.45,0.2],0.012,0.008,pale); g.add(a); });
+  armL.rotation.z=0.06; armR.rotation.z=-0.06;
   g.userData.arms=[armL,armR]; g.userData.drips=[];
-  for(let i=0;i<4;i++){ const d=mesh(BG(0.04,0.16,0.04),bas({color:0x4a7a9a}),rand(-0.3,0.3),1.2,rand(-0.2,0.2),g); g.userData.drips.push(d); }
+  for(let i=0;i<7;i++){ const d=mesh(BG(0.03,0.14,0.03),bas({color:0x4a6a7a}),rand(-0.35,0.35),rand(1.2,2.8),rand(-0.15,0.2),g); g.userData.drips.push(d); }
   return g;
 }
 
 // ---------- HOLLOW KID ----------
 function makeHollowKid(col){
-  const g=new THREE.Group(); const hood=lam({color:col||0x2a3040}), skin=lam({color:0xa8a090});
-  mesh(BG(0.55,1.0,0.32),hood,0,1.0,0,g,0.2,0,0);
-  [-0.15,0.15].forEach(x=>mesh(BG(0.2,0.7,0.22),lam({color:0x181c24}),x,0.3,0,g));
-  const head=new THREE.Group(); head.position.set(0,1.7,0.1); head.rotation.set(0.25,0,-0.25); g.add(head);
-  mesh(SG(0.22,7,6),skin,0,0,0,head); mesh(BG(0.5,0.18,0.5),hood,0,0.12,-0.04,head);
-  [-0.08,0.08].forEach(x=>mesh(SG(0.05,4,3),bas({color:0x000000}),x,0.02,0.2,head));
-  mesh(BG(0.1,0.18,0.05),bas({color:0x100000}),0,-0.1,0.2,head);
-  const arm=new THREE.Group(); arm.position.set(0.36,1.4,0); mesh(BG(0.14,0.7,0.14),hood,0,-0.35,0,arm); arm.rotation.x=-1.4; g.add(arm);
-  const ph=mesh(BG(0.18,0.3,0.03),bas({color:0xaed0ff}),0,-0.78,0.0,arm,0,0,0); ph.position.set(0,-0.75,0.05);
-  const gl=new THREE.Sprite(new THREE.SpriteMaterial({map:glowTex,color:0x9fc8ff,transparent:true,depthWrite:false,blending:THREE.AdditiveBlending,fog:false,opacity:0.7})); gl.scale.setScalar(2.2); gl.position.set(0.36,1.5,0.5); g.add(gl);
+  // the hollow kids: urbex teens who never left. Hood up, face gone dark, phone still recording
+  const g=new THREE.Group(); const hood=lam({color:col||0x2a3040}), jeans=lam({color:0x161a22}), skin=lam({color:0x8e877a});
+  [-0.12,0.12].forEach(x=>{ bone(g,[x,0,0.05],[x,0.75,0],0.07,0.08,jeans); bone(g,[x,0.75,0],[x*0.9,0.95,0.02],0.08,0.09,jeans); });
+  const torso=mesh(CG(0.27,0.24,0.85,8),hood,0,1.35,0,g,0.15,0,0); torso.scale.z=0.75;
+  const head=new THREE.Group(); head.position.set(0,1.95,0.12); head.rotation.set(0.5,0,-0.55); g.add(head);   // neck bent too far
+  mesh(SG(0.25,8,6),hood,0,0.02,-0.03,head).scale.set(1,1.1,1.05);
+  mesh(SG(0.19,7,6),bas({color:0x000000}),0,-0.02,0.1,head);                                       // no face, just the dark inside the hood
+  eyeShine(head,-0.06,0.0,0.27,0.1,0xbfd8ff); eyeShine(head,0.06,0.0,0.27,0.1,0xbfd8ff);
+  mesh(SG(0.08,6,5),skin,0,-0.2,0.18,head);                                                        // a pale chin catching the phone light
+  const arm=new THREE.Group(); arm.position.set(0.3,1.62,0); g.add(arm); arm.rotation.x=-1.35;
+  bone(arm,[0,0,0],[0,-0.62,0],0.06,0.05,hood); bone(arm,[0,-0.62,0],[0,-0.72,0.04],0.035,0.03,skin);
+  const ph=mesh(BG(0.16,0.28,0.025),bas({color:0xaed0ff}),0,-0.78,0.06,arm);
+  const armL=new THREE.Group(); armL.position.set(-0.3,1.62,0); g.add(armL); bone(armL,[0,0,0],[-0.05,-0.75,0.05],0.06,0.05,hood); bone(armL,[-0.05,-0.75,0.05],[-0.05,-0.95,0.08],0.035,0.025,skin);
+  const gl=new THREE.Sprite(new THREE.SpriteMaterial({map:glowTex,color:0x9fc8ff,transparent:true,depthWrite:false,blending:THREE.AdditiveBlending,fog:false,opacity:0.7})); gl.scale.setScalar(2.2); gl.position.set(0.3,1.55,0.75); g.add(gl);
   g.userData.glow=gl; return g;
 }
 
 // ---------- MIRROR FOLK ----------
 function makeMirrorFolk(){
-  const g=new THREE.Group(); const sk=lam({color:0x9aa2a8}), shirt=lam({color:0xc8c8c0});
-  mesh(BG(0.5,1.2,0.28),shirt,0,1.8,0,g); mesh(BG(0.12,0.8,0.12),sk,0,2.6,0,g);
-  const head=new THREE.Group(); head.position.y=3.05; head.rotation.z=-0.2; g.add(head);
-  mesh(SG(0.28,8,6),sk,0,0,0,head).scale.y=1.4;
-  mesh(BG(0.3,0.5,0.04),bas({color:0x6a8aa8}),0,0.05,0.26,head);
-  [-0.1,0.1].forEach(x=>mesh(BG(0.06,0.14,0.04),bas({color:0x000000}),x,0.12,0.29,head));
-  mesh(BG(0.14,0.2,0.04),bas({color:0x050000}),0,-0.1,0.29,head);
-  [-1,1].forEach(s=>{ const a=new THREE.Group(); a.position.set(s*0.38,2.3,0); mesh(BG(0.1,1.4,0.1),sk,0,-0.7,0,a); mesh(BG(0.1,1.0,0.1),sk,0,-1.6,0.35,a,0.8,0,0); g.add(a); a.rotation.z=s*0.08; });
-  [-0.18,0.18].forEach(x=>{ mesh(BG(0.12,1.2,0.12),sk,x,0.6,0,g); mesh(BG(0.12,0.6,0.12),sk,x,0.1,-0.25,g,-0.6,0,0); });
+  // mirror folk: a tall thin shape wearing your reflection, its face a cracked mirror
+  const g=new THREE.Group(); const sk=lam({color:0x8e959a}), suit=lam({color:0x1c1f24}), glass=bas({color:0x8fb0c8}), crack=bas({color:0x0a0d10});
+  [-0.14,0.14].forEach(x=>{ bone(g,[x,0,0.05],[x,1.25,0],0.05,0.07,suit); bone(g,[x,1.25,0],[x*0.7,2.0,0],0.07,0.09,suit); });
+  const body=mesh(CG(0.26,0.18,1.2,7),suit,0,2.6,0,g); body.scale.z=0.6;
+  bone(g,[0,3.15,0],[0,3.45,0.04],0.05,0.05,sk);
+  const head=new THREE.Group(); head.position.set(0,3.75,0.05); head.rotation.z=-0.32; g.add(head);
+  mesh(SG(0.26,8,6),sk,0,0,-0.02,head).scale.set(0.85,1.35,0.85);
+  const face=mesh(new THREE.CircleGeometry(0.22,10),glass,0,0.02,0.2,head); face.scale.y=1.35;
+  [[0,0.25,-0.05,-0.2],[0.02,-0.22,0.12,0.2],[-0.03,0.05,-0.18,-0.12]].forEach(([x1,y1,x2,y2])=>bone(head,[x1,y1,0.215],[x2,y2,0.215],0.007,0.007,crack));
+  eyeShine(head,-0.07,0.08,0.24,0.12,0xffffff); eyeShine(head,0.08,0.06,0.24,0.12,0xffffff);
+  [-1,1].forEach(s=>{ const a=new THREE.Group(); a.position.set(s*0.3,3.1,0); g.add(a);
+    bone(a,[0,0,0],[s*0.12,-1.2,0.05],0.045,0.04,suit); knuckle(a,[s*0.12,-1.2,0.05],0.05,sk); bone(a,[s*0.12,-1.2,0.05],[s*0.1,-2.25,0.3],0.04,0.03,sk);
+    for(let f=0;f<5;f++) bone(a,[s*0.1,-2.25,0.3],[s*0.1+(f-2)*0.045,-2.75,0.42],0.01,0.006,sk); a.rotation.z=s*0.06; });
   return g;
 }
 
@@ -2068,6 +2095,10 @@ setInterval(()=>{
       const g=AC.createGain(); g.gain.value=0; n.connect(bp); bp.connect(g); g.connect(master); n.start(); fuzzHiss=g; }
     fuzzHiss.gain.setTargetAtTime(a*a*0.09*(0.6+Math.random()*0.8),AC.currentTime,0.05); }
 },100);
+
+// creatures twitch while you watch: a sudden jerk of the whole body, then stillness again
+setInterval(()=>{ if(!started||paused||dead) return; allMons().forEach(m=>{ if(!m.active||!m.g.visible||!m.frozen) return;
+  if(Math.random()<0.06){ const r0=m.g.rotation.z; m.g.rotation.z=r0+(Math.random()-0.5)*0.35; setTimeout(()=>{ m.g.rotation.z=r0; },90+Math.random()*120); } }); },200);
 </script>
 </body>
 </html>
