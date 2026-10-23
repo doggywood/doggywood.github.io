@@ -1617,7 +1617,10 @@ function pollPad(dt){
     if(hit(2)) fakeKey('KeyF');                                                    // X: flashlight
     if(hit(3)||hit(6)) fakeKey('KeyQ');                                            // Y or LT: body cam
     if(hit(7)) tryPhoto();                                                         // RT: photo (RB is pause)
-    if(camOn&&(hit(12)||hit(13))){ zoomTarget=clamp(zoomTarget*(hit(12)?1.2:1/1.2),1,7); blip(500+zoomTarget*120,0.03,'square',0.04); }   // d-pad: zoom
+    { const up=b(12), dn=b(13), step=d=>{ zoomTarget=clamp(zoomTarget*(d>0?1.2:1/1.2),1,7); blip(500+zoomTarget*120,0.03,'square',0.04); };   // d-pad: zoom, hold to keep zooming (3 steps a second)
+      if(camOn&&(hit(12)||hit(13))){ step(hit(12)?1:-1); pad.zoomRep=0; }
+      else if(camOn&&(up||dn)){ pad.zoomRep=(pad.zoomRep||0)+dt; if(pad.zoomRep>=1/3){ pad.zoomRep-=1/3; step(up?1:-1); } }
+      else pad.zoomRep=0; }
   }
   if(gp.axes.some(a=>Math.abs(a)>0.25)||gp.buttons.some(x=>x.pressed)) pad.lastUse=performance.now()/1000;
   pad.prev=gp.buttons.map(x=>x.pressed);
