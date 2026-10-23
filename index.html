@@ -1371,7 +1371,7 @@ function breakerDone(){
   powerOn(); setMusic({distort:0.3,vol:0.5}); musicAt(60,6,-30);
   later(1.2,()=>{ WORLD.gateMeshL.visible=WORLD.gateMeshR.visible=true; WORLD.gateCol.active=true; noiseBurst(1.2,160,0.6,0.4); blip(70,0.9,'square',0.3); });
   later(2,()=>{ if(hymnG) hymnG.gain.linearRampToValueAtTime(0.11,AC.currentTime+8); });
-  later(5,()=>dale('Hey. The gate just... get back to your car. Don\'t go near the--',5));
+  later(5,()=>dale('Hey. The gate just... get back to your car. Don\'t go near the--',5)); later(5.3,()=>{ daleTaken=true; });
   later(10,()=>{ dogs[3].active=true; dogs[3].mode='fake'; dogs[1].mode='guide'; dogs[1].active=true; dogs[2].mode='guide'; dogs[2].active=true; activateDogs(3); });
   later(14,()=>{ spawnChoir(choirs[0],-6,50); });
   later(22,()=>{ mons.tyke.noclipT=40; mons.tyke.t=0; mons.tyke.active=true; mons.tyke.g.position.y=0; mons.tyke.g.visible=true; stinger(0.6); say('Something drops off the car roof.',4); });
@@ -1793,6 +1793,7 @@ setInterval(()=>{
 },100);
 
 // ---------- voices: pre-recorded natural voices; Dale comes through a walkie-talkie ----------
+let daleTaken=false;   // after his last real call, 'Dale' is the thing using his voice
 let VOX={}; fetch('voice/lines.json').then(r=>r.ok?r.json():{}).then(j=>{VOX=j;}).catch(()=>{});
 const voxCache={}; let voxSrc=null;
 function playVoice(who,text){
@@ -1801,6 +1802,11 @@ function playVoice(who,text){
     const src=AC.createBufferSource(); src.buffer=buf; let node=src;
     const g=AC.createGain(); g.gain.value=who==='dale'?0.55:1.0;
     let t0=AC.currentTime;
+    if(who==='dale'&&daleTaken){
+      // not the radio: it's using his voice, from somewhere out in the dark
+      const a=Math.random()*TAU, pos={x:player.pos.x+Math.cos(a)*14,y:1.6,z:player.pos.z+Math.sin(a)*14};
+      src.playbackRate.value=0.95; g.gain.value=1.0; const pn=pan3(pos.x,pos.y,pos.z); node.connect(g); g.connect(pn); pn.connect(master); src.start(t0); voxSrc=src; return;
+    }
     if(who==='dale'){
       // walkie-talkie: key-in click + squelch, light grit (keeps his voice dynamic), static under him, squelch tail when he lets go
       const hp=AC.createBiquadFilter(); hp.type='highpass'; hp.frequency.value=320; const lp=AC.createBiquadFilter(); lp.type='lowpass'; lp.frequency.value=3400;
