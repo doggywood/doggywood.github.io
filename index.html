@@ -60,7 +60,6 @@
   <p>Fog is light. Lit lamps show you the park, and its silhouettes. The dogs never touch you. They only move when you aren't looking. Wear headphones.</p>
   <p id="padnote" style="display:none;color:#ffd35a">CONTROLLER: Left stick move &nbsp; Right stick look &nbsp; A interact (hold) &nbsp; X flashlight &nbsp; Y body cam &nbsp; RT photo &nbsp; LB sprint &nbsp; B crouch &nbsp; D-pad zoom &nbsp; &mdash; press A to begin</p>
   <p id="musicnote" style="color:#6a7"></p>
-  <p><label id="songbtn" style="color:#ffd35a;cursor:pointer;border:1px solid #ffd35a;padding:6px 12px;display:inline-block">[ load a song for the car radio ]<input type="file" id="songfile" accept="audio/*" multiple hidden></label> <span id="songlist" style="color:#6a7"></span></p>
   <p style="margin-top:22px;color:#fff">[ click to begin ]</p>
 </div>
 <div id="death"><h1 style="color:#c22">DEAD</h1><p id="dmsg"></p><p style="color:#fff">[ press R to try again ]</p></div>
@@ -1657,18 +1656,8 @@ requestAnimationFrame(loop);
 <script>
   $('musicnote').textContent = location.protocol==='file:' ? 'Music disabled (opened as a file). Double-click play.bat to run with your own tracks from /music.' : 'Put your own tracks in the music folder (track1.mp3, track2.mp3 ... or list them in music/playlist.json). They play as the car radio, then decay as the night goes wrong.';
 
-$('songbtn').addEventListener('click',e=>e.stopPropagation());
-// Songs picked from this device are saved in this browser (IndexedDB) so you only pick once. Never uploaded.
-const songDB=()=>new Promise((ok,no)=>{ const r=indexedDB.open('doggywood',1); r.onupgradeneeded=()=>r.result.createObjectStore('songs'); r.onsuccess=()=>ok(r.result); r.onerror=()=>no(r.error); });
-async function songsGet(){ try{ const db=await songDB(); return await new Promise(ok=>{ const q=db.transaction('songs').objectStore('songs').get('list'); q.onsuccess=()=>ok(q.result||[]); q.onerror=()=>ok([]); }); }catch(e){ return []; } }
-async function songsPut(list){ try{ const db=await songDB(); db.transaction('songs','readwrite').objectStore('songs').put(list,'list'); }catch(e){} }
-function showSongs(names){ $('songlist').textContent = names.length ? ' ♪ '+names.join(', ')+' (saved on this device)' : ''; $('songbtn').firstChild.textContent = names.length ? '[ change song ]' : '[ load a song for the car radio ]'; }
-async function useSongs(list){ localSongs.length=0; for(const s of list) localSongs.push(await s.blob.arrayBuffer()); showSongs(list.map(s=>s.name)); }
-$('songfile').addEventListener('change',async e=>{ e.stopPropagation(); const fs=[...e.target.files]; if(!fs.length) return;
-  const list=fs.map(f=>({name:f.name.replace(/\.[^.]+$/,'').replace(/\s*\(.*?\)\s*/g,' ').trim(), blob:f})); await songsPut(list); await useSongs(list); });
-songsGet().then(list=>{ if(list.length) useSongs(list); });
 music.vol = 0.55/3;   // radio sits quietly under the game
-$('musicnote').textContent = 'Car radio: Kavinsky - Nightcall. (Optional: pick a different song below; it stays on this device.)';
+$('musicnote').textContent = 'Car radio: Kavinsky - Nightcall';
 </script>
 </body>
 </html>
