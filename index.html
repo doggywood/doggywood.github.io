@@ -26,7 +26,7 @@
   #rec{position:absolute;right:20px;top:16px;font-size:15px;text-align:right;display:none}
   #rec .dot{color:#f22;animation:bl 1s steps(2) infinite}
   @keyframes bl{50%{opacity:0}}
-  #clock{position:absolute;right:20px;bottom:16px;font-size:14px;opacity:.8}
+  #clock{display:none;position:absolute;right:20px;bottom:16px;font-size:14px;opacity:.8}
   #prompt{position:absolute;left:0;right:0;bottom:22%;text-align:center;font-size:16px;color:#fff}
   #sub{position:absolute;left:10vw;right:10vw;bottom:9%;text-align:center;font-size:17px;color:#ffe9b0}
   #bar{position:absolute;left:35vw;right:35vw;bottom:30%;height:8px;border:1px solid #c33;display:none}
@@ -451,11 +451,14 @@ function makeDog(fake){
   // body
   mesh(CG(0.46,0.68,1.4,10),fur,0,1.2,0,g);
   mesh(BG(0.6,0.9,0.12),light,0,1.15,0.5,g);
-  // torn patch showing ribs & meat
-  mesh(BG(0.34,0.5,0.06),red,0.34,1.2,0.42,g,0,0.5,0);
-  [-0.15,0,0.15].forEach(o=>mesh(BG(0.3,0.04,0.04),white,0.36,1.2+o,0.46,g,0,0.5,0));
-  // seams
-  mesh(BG(1.35,0.03,0.03),bas({color:0x2a0606}),0,1.62,0.5,g);
+  // old costume coming apart: a torn patch with yellowed stuffing poking out (no blood)
+  const stuff=lam({color:0xd9cfb4}), thread=bas({color:0x3a2a1a});
+  mesh(BG(0.34,0.5,0.06),lam({color:0x4a3a2a}),0.34,1.2,0.42,g,0,0.5,0);
+  [[0.3,1.32],[0.4,1.18],[0.32,1.06],[0.42,1.3]].forEach(([x,y],i)=>mesh(SG(0.07+i%2*0.03,5,4),stuff,x,y,0.48,g));
+  // seams, one split open
+  mesh(BG(1.35,0.03,0.03),thread,0,1.62,0.5,g);
+  [-0.3,-0.15,0,0.15].forEach(x=>mesh(BG(0.02,0.08,0.02),thread,x,1.62,0.51,g));
+  mesh(SG(0.06,5,4),stuff,0.42,1.62,0.5,g);
   // legs + big gloved paws
   [-0.26,0.26].forEach(x=>{ mesh(BG(0.32,0.9,0.36),fur2,x,0.45,0,g); mesh(SG(0.26,6,5),white,x,0.12,0.12,g); });
   // arms
@@ -474,7 +477,7 @@ function makeDog(fake){
   const eR=mesh(SG(0.11,7,6),white,0.28,0.18,0.52,head); eR.scale.z=0.4; mesh(SG(0.035,4,3),dark,0.31,0.14,0.62,head);
   mesh(BG(0.3,0.04,0.05),fur2,0.28,0.34,0.55,head,0,0,-0.35);
   // ears: floppy, left one torn
-  const eaL=mesh(BG(0.2,0.8,0.34),fur2,-0.62,0.0,0.0,head,0,0,0.3); mesh(BG(0.12,0.3,0.06),red,-0.66,-0.2,0.18,head,0,0,0.3);
+  const eaL=mesh(BG(0.2,0.8,0.34),fur2,-0.62,0.0,0.0,head,0,0,0.3); mesh(SG(0.07,5,4),stuff,-0.7,-0.36,0.12,head); mesh(BG(0.015,0.22,0.015),thread,-0.72,-0.5,0.14,head);   // frayed ear, a loose thread
   mesh(BG(0.2,0.78,0.34),fur2,0.62,-0.02,0,head,0,0,-0.3);
   // mouth
   const n=fake?15:9;
@@ -485,7 +488,6 @@ function makeDog(fake){
     for(let i=0;i<n;i++){ const t=i/(n-1)*2-1; const x=t*0.34, z=0.85-Math.abs(t)*0.3; mesh(BG(0.03,0.07,0.03),dark,x,-0.36+Math.abs(t)*0.1,z,head);
       if(i%2===0) mesh(BG(0.018,0.17,0.02),dark,x,-0.36+Math.abs(t)*0.1,z+0.01,head); }
     mesh(BG(0.1,0.34,0.04),pink,0.26,-0.52,0.82,head,0,0,0.15);
-    mesh(BG(0.04,0.2,0.03),red,0.28,-0.74,0.82,head);
   }
   // collar + bell
   const col=mesh(new THREE.TorusGeometry(0.42,0.06,5,10),lam({color:0x8a1020}),0,1.92,0,g,Math.PI/2,0,0);
@@ -1169,7 +1171,7 @@ function initStatueMons(){
     tick:(m,dt)=>{ m.g.userData.drips.forEach(d=>{ d.position.y-=dt*1.6; if(d.position.y<0) d.position.y=rand(1.0,2.0); }); }});
   mons.mirror=new StatueMon(makeMirrorFolk(),{speed:2.9,h:3.4,kill:1.5,msg:'You looked away. It had stepped out of the glass.',name:'mirror'});
   mons.kids=[0,1,2].map(i=>new StatueMon(makeHollowKid([0x2a3040,0x402a34,0x2a4034][i]),{speed:2.1,h:2,kill:1.3,hurtOnly:true,msg:'Your friends are still filming.',name:'kid',
-    tick:(m,dt,d,seen)=>{ m.g.userData.glow.material.opacity=0.55+Math.random()*0.3; if(!seen&&d<22&&Math.random()<dt*0.12) speak(pick(['Hello? Is somebody there?','Please. It hurts.','Dale? Dale is that you?','Don\'t look at me.','Are you filming?','We\'re live. Say hi.']),0.4,0.5,0.75); }}));
+    tick:(m,dt,d,seen)=>{ m.g.userData.glow.material.opacity=0.55+Math.random()*0.3; if(!seen&&d<22&&Math.random()<dt*0.12) hollowSay(m,pick(['Hello? Is somebody there?','Please. It hurts.','Dale? Dale is that you?','Don\'t look at me.','Are you filming?','We\'re live. Say hi.'])); }}));
   mons.horses=[0,1,2].map(i=>new StatueMon(makeHorse(true),{speed:3.3,h:2.2,kill:1.6,hurtOnly:true,msg:'The carousel horses finished their lap.',name:'horse',
     tick:(m,dt,d,seen)=>{ if(!seen) m.g.children.forEach(c=>{ if(c.userData.leg) c.rotation.x=Math.sin(tNow*10)*0.5; }); }}));
   mons.usher=new StatueMon(makeUsher(),{speed:2.5,h:3.4,kill:1.7,msg:'The Usher found you a seat.',name:'usher',boost:2.2});
@@ -1347,7 +1349,7 @@ function makeKid(col){
 function kidsEvent(){
   kidA=makeKid(0x22304a); kidB=makeKid(0x4a2230);
   kidA.visible=kidB.visible=true; kidRun={t:0};
-  speak('Yo yo yo, someone\'s over there!',1.5,0.9); setTimeout(()=>speak('Run! Go go go go!',1.0,0.9),2200); setTimeout(()=>speak('Hahahaha!',1.7,0.8),4000);
+  later(0.2,()=>teenA('Yo, someone\'s over there!',kidPos())); later(2.4,()=>teenB('Run! Go, go, go!',kidPos())); later(4.2,()=>teenB('Hehe... heh heh heh.',kidPos()));
   later(11,()=>{ kidA.visible=kidB.visible=false; kidRun=null; scene.remove(kidA); scene.remove(kidB);
     dale('Urbex kids. They climb the fence every weekend to film their videos. Ignore them.',5); });
   later(16,()=>{ scream(V(-110,1.5,-90)); });
@@ -1865,6 +1867,25 @@ setInterval(()=>{
     g.scale.setScalar(Math.max(0.01,1-(R.t-0.9)*0.9)); g.rotation.y+=dt*8; }
   if(R.t>2.8){ g.visible=false; g.scale.setScalar(1); g.rotation.x=0; g.rotation.z=0; R.m.despawn(); const k=R.kind; RESCUE=null; later(0.4,()=>liam(RESCUE_LINES[k])); }
 },50);
+
+// ---------- teen voices (recorded). teenA = boy, teenB = girl, teenC = younger boy ----------
+/* lines recorded by tools/make-voices.py:
+ teenA('Hello? Is somebody there?') teenB('Please. It hurts.') teenC('Dale? Dale is that you?') teenB('Don\'t look at me.') teenA('Are you filming?') teenC('We\'re live. Say hi.')
+ teenB('Hehe... heh heh.') teenA('Heh... heh heh heh.') */
+const kidPos=()=>kidA&&kidA.position?{x:kidA.position.x,y:1.5,z:kidA.position.z}:null;
+function teenVoice(who,text,pos,rate){
+  if(!AC) return; const fn=VOX[who+'|'+text]; if(!fn) return;
+  const play=buf=>{ const src=AC.createBufferSource(); src.buffer=buf; if(rate) src.playbackRate.value=rate; const g=AC.createGain(); g.gain.value=0.9; src.connect(g);
+    if(pos){ const p=pan3(pos.x,pos.y,pos.z); g.connect(p); p.connect(master); } else g.connect(master); src.start(); };
+  if(voxCache[fn]) play(voxCache[fn]); else fetch('voice/'+fn).then(r=>r.arrayBuffer()).then(b=>AC.decodeAudioData(b)).then(buf=>{ voxCache[fn]=buf; play(buf); }).catch(()=>{});
+}
+function teenA(t,pos){ teenVoice('teenA',t,pos); }
+function teenB(t,pos){ teenVoice('teenB',t,pos); }
+function teenC(t,pos){ teenVoice('teenC',t,pos); }
+// the hollow kids: each has its own voice, slowed down, coming from where it stands, sometimes followed by a giggle
+const HOLLOW={'Hello? Is somebody there?':'teenA','Please. It hurts.':'teenB','Dale? Dale is that you?':'teenC','Don\'t look at me.':'teenB','Are you filming?':'teenA','We\'re live. Say hi.':'teenC'};
+function hollowSay(m,text){ const who=HOLLOW[text]||'teenA', pos={x:m.g.position.x,y:1.4,z:m.g.position.z};
+  teenVoice(who,text,pos,0.82); if(Math.random()<0.35) setTimeout(()=>teenVoice(who==='teenB'?'teenB':'teenA',who==='teenB'?'Hehe... heh heh.':'Heh... heh heh heh.',pos,0.8),2600); }
 </script>
 </body>
 </html>

@@ -7,10 +7,11 @@ def unq(t): return t.replace(BS+"'","'")
 PAT=lambda fn: fn+BS+"('((?:[^'"+BS+BS+"]|"+BS+BS+".)*)'"
 dale=[unq(m) for m in re.findall(PAT('dale'), s)]
 liam=[unq(m) for m in re.findall(PAT('liam'), s)]
-VO={'dale':('en-US-GuyNeural','-5%','-6Hz'),'liam':('en-US-AndrewNeural','+0%','+0Hz')}
+teens={w:[unq(m) for m in re.findall(PAT(w), s)] for w in ('teenA','teenB','teenC')}
+VO={'dale':('en-US-GuyNeural','-5%','-6Hz'),'liam':('en-US-AndrewNeural','+0%','+0Hz'),'teenA':('en-US-BrianNeural','+6%','+16Hz'),'teenB':('en-US-AvaNeural','+4%','+10Hz'),'teenC':('en-US-ChristopherNeural','+8%','+26Hz')}
 out=os.path.join(root,'voice'); os.makedirs(out,exist_ok=True)
 man={}
-for who,lines in (('dale',dale),('liam',liam)):
+for who,lines in [('dale',dale),('liam',liam)]+list(teens.items()):
   for t in dict.fromkeys(lines):
     if t=='t' or not t.strip(): continue
     fn=who+'_'+hashlib.md5(t.encode()).hexdigest()[:8]+'.mp3'; man[who+'|'+t]=fn
