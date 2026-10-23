@@ -35,7 +35,19 @@
   #photo{position:fixed;left:18px;bottom:60px;display:none;opacity:0;transition:opacity 1.2s;border:6px solid #e8e2cf;border-bottom-width:22px;transform:rotate(-3deg);box-shadow:0 4px 18px #000}
   #death,#end,#start{position:fixed;inset:0;display:none;align-items:center;justify-content:center;flex-direction:column;text-align:center;background:rgba(0,0,0,.93);z-index:9}
   #start{display:flex;cursor:pointer}
-  #death{background:rgba(70,0,0,.92)}
+  #death{background:rgba(40,0,0,.9);z-index:21}
+  #death .opt{color:#fff;font-size:20px;margin-top:22px;cursor:pointer}
+  #sigloss{position:fixed;inset:0;display:none;z-index:20;background:#000;align-items:center;justify-content:center}
+  #sigloss .snow{position:absolute;inset:0;background:repeating-linear-gradient(0deg,rgba(255,255,255,.08) 0,rgba(255,255,255,.08) 1px,transparent 1px,transparent 3px);animation:snow .12s steps(2) infinite}
+  @keyframes snow{50%{background-position:0 2px;opacity:.6}}
+  #sigloss p{position:relative;color:#d8ffe0;font-size:22px;letter-spacing:.35em;animation:bl 1s steps(2) infinite}
+  #menu{position:fixed;inset:0;display:none;z-index:22;background:rgba(0,0,0,.78);align-items:center;justify-content:center}
+  #menu .box{min-width:340px;max-width:90vw;border:1px solid #6a7;padding:24px 30px;background:rgba(6,12,8,.92)}
+  #menu h2{margin:0 0 16px;letter-spacing:.4em;color:#e8e0c8;font-weight:normal}
+  #menu .it{padding:9px 12px;font-size:18px;color:#cfe;cursor:pointer;border-left:3px solid transparent}
+  #menu .it.sel{background:rgba(160,220,170,.14);border-left-color:#ffd35a;color:#fff}
+  #menu .hint{color:#7a8a7f;font-size:12px;margin-top:16px}
+  #mhelp{display:none;font-size:14px;line-height:1.7;color:#cfe;margin-top:10px}
   h1{letter-spacing:.45em;font-size:46px;margin:0 0 10px;color:#e8e0c8;text-shadow:3px 0 #a00,-3px 0 #08a}
   p{max-width:660px;line-height:1.6;color:#aab;margin:6px 0;font-size:14px}
   .k{color:#ffd35a}
@@ -68,7 +80,9 @@
   <p style="margin-top:22px;color:#fff">[ click to begin ]</p>
 </div>
 <div id="refs" style="position:fixed;inset:0;display:none;align-items:center;justify-content:center;background:rgba(0,0,0,.85);z-index:10;color:#ffd35a;font-size:28px;cursor:pointer">[ press A to go back to full screen ]</div>
-<div id="death"><h1 style="color:#c22">DEAD</h1><p id="dmsg"></p><p style="color:#fff">[ press R / A to continue from the last checkpoint ]</p></div>
+<div id="sigloss"><div class="snow"></div><p>SIGNAL LOST</p></div>
+<div id="death"><h1 style="color:#c22;letter-spacing:.3em">YOU DIED</h1><p id="dmsg"></p><p class="opt" id="dcont">&#9654; Continue from checkpoint <span class="k2" id="dkey">[R]</span></p><p style="color:#8a8070;font-size:13px">Pause menu: <span id="dmkey">Esc</span></p></div>
+<div id="menu"><div class="box"><h2>PAUSED</h2><div id="mitems"></div><div id="mhelp"></div><p class="hint" id="mhint"></p></div></div>
 <div id="end"><h1>&mdash;</h1><p id="emsg"></p></div>
 
 <script>/**
@@ -1096,6 +1110,7 @@ function nearestDogDist(){ let b=1e9; dogs.forEach(d=>{ if(d.g.visible) b=Math.m
 let dogRate=1;
 function updateAmbientDog(d,dt){
   if(!d.active) return;
+  if(dogSeen(d)){ d.unseen=0; d.wasSeen=true; return; } d.unseen+=dt; dogFade(d); return;   // no more flitting around
   if(dogSeen(d)){ d.unseen=0; return; }
   d.unseen+=dt;
   if(d.unseen<d.delay*dogRate) return;
@@ -1129,13 +1144,14 @@ function guidePlace(d,target,pointTarget){
   return false;
 }
 function updateGuideDog(d,dt,target,decoy){
-  if(!d.active||!target) return;
-  if(dogSeen(d)){ if(d.behind){ d.behind=false; stinger(0.7); thump(0.6); } d.unseen=0; return; }
+  if(!d.active||(d.fake&&!target)) return;
+  if(dogSeen(d)){ if(d.behind){ d.behind=false; stinger(0.7); thump(0.6); } d.unseen=0; d.wasSeen=true; return; }
   d.unseen+=dt;
-  if(d.unseen<(d.fake?7:5)) return;
-  if(!d.fake&&tryBehind(d,decoy||target)){ d.unseen=0; return; }
-  if(guidePlace(d,target,decoy)) d.unseen=0; else d.unseen=3;
+  if(!d.fake){ dogFade(d); return; }               // he only shows up after tasks and at certain spots (dogNext / dogSpots)
+  if(d.unseen<25) return;                          // the cult's fake still sets its trap now and then
+  if(guidePlace(d,target,decoy)) d.unseen=0; else d.unseen=18;
 }
+function dogFade(d){ if(d.g.visible&&d.wasSeen&&d.unseen>4){ d.g.visible=false; d.wasSeen=false; } }
 
 // ---------- statue-rule monsters ----------
 class StatueMon{
@@ -1292,7 +1308,9 @@ function hurt(n,why){
 }
 function die(why){
   if(dead||ended) return; dead=true; stinger(1.2);
-  $('dmsg').textContent=why; $('death').style.display='flex';
+  $('dmsg').textContent=why; $('sigloss').style.display='flex'; noiseBurst(1.4,2600,0.35,0.4);
+  $('dkey').textContent=pad.on?'[A]':'[R]'; $('dmkey').textContent=pad.on?'Menu button':'Esc';
+  setTimeout(()=>{ if(dead){ $('sigloss').style.display='none'; $('death').style.display='flex'; } },1700);
   try{document.exitPointerLock();}catch(e){}
   if(choirVoice) choirVoice.gain.gain.value=0; if(sextonVoice) sextonVoice.gain.gain.value=0;
 }
@@ -1325,11 +1343,12 @@ function nearInteract(){
 
 // ---------- story ----------
 function boothDone(){
+  later(3,dogNext);
   stage=1; setOrder(); later(0.5,checkpoint); later(8.5,()=>liam('Lights work. Photos, then I\'m out of here.')); WORLD.ticketLight.intensity=1.5; WORLD.ticketWin.material.color.set(0xffe7a0); blip(900,0.1,'square',0.1);
   dale('Good. Lights work. Solomon wants three photos for the file: fountain, ferris wheel, coaster. Use the body cam.',7);
 }
 function photoTaken(t){
-  t.done=true; if(photosTaken===0) later(0.8,()=>liam('One for the file.')); if(photosTaken===2) later(0.6,()=>liam('That\'s the last photo.')); photosTaken++; setOrder(); shotWait=3;
+  t.done=true; if(photosTaken===0) later(0.8,()=>liam('One for the file.')); if(photosTaken===2) later(0.6,()=>liam('That\'s the last photo.')); photosTaken++; setOrder(); shotWait=3; if(photosTaken>=2) later(2.5,dogNext);
   if(photosTaken===1){
     later(4,()=>{ musicDuck(4); }); later(5,()=>{ const d=dogs[0]; d.active=true; placeDog(d,11,3.35,-52,{away:false}); });
     later(7,()=>dale('Mm. You get a good shot? ...The park had a mascot. A dog. If you see one of the old suits, don\'t let it bother you.',6));
@@ -1357,6 +1376,7 @@ function kidsEvent(){
   later(19,()=>{ dale('...Did you hear that?',3); stage=1; });
 }
 function activateDogs(n){
+  return;   // only one dog now
   let k=0; for(const d of dogs){ if(k>=n) break; if(d.active||d.fake||d.mode==='guide') continue; d.active=true; k++;
     const c=WORLD.dogSpots.filter(s=>Math.hypot(s.x-player.pos.x,s.z-player.pos.z)>30&&!seenPoint(_t.set(s.x,s.y+1.6,s.z))); if(c.length){ const s=pick(c); placeDog(d,s.x,s.y,s.z,{away:Math.random()<0.3}); } }
 }
@@ -1369,10 +1389,11 @@ function powerOn(){
 function breakerDone(){
   stage=3; setOrder(); later(0.5,checkpoint); later(3,()=>liam('Wait. Did the gate just close?')); WORLD.breakerLamp.material.color.set(0x22ff44); blip(120,0.6,'sawtooth',0.3); stinger();
   powerOn(); setMusic({distort:0.3,vol:0.5}); musicAt(60,6,-30);
+  later(1.2,()=>{ carWatcher.visible=true; carWatcher.userData.glow.intensity=0.9; watcherT=0; });
   later(1.2,()=>{ WORLD.gateMeshL.visible=WORLD.gateMeshR.visible=true; WORLD.gateCol.active=true; noiseBurst(1.2,160,0.6,0.4); blip(70,0.9,'square',0.3); });
   later(2,()=>{ if(hymnG) hymnG.gain.linearRampToValueAtTime(0.11,AC.currentTime+8); });
   later(5,()=>dale('Hey. The gate just... get back to your car. Don\'t go near the--',5)); later(5.3,()=>{ daleTaken=true; });
-  later(10,()=>{ dogs[3].active=true; dogs[3].mode='fake'; dogs[1].mode='guide'; dogs[1].active=true; dogs[2].mode='guide'; dogs[2].active=true; activateDogs(3); });
+  later(10,()=>{ dogs[3].active=true; dogs[3].mode='fake'; dogs[1].mode='guide'; dogs[1].active=true; dogNext(); });
   later(14,()=>{ spawnChoir(choirs[0],-6,50); });
   later(22,()=>{ mons.tyke.noclipT=40; mons.tyke.t=0; mons.tyke.active=true; mons.tyke.g.position.y=0; mons.tyke.g.visible=true; stinger(0.6); say('Something drops off the car roof.',4); });
   later(30,()=>{ revealBody('jax'); });
@@ -1387,11 +1408,12 @@ function sigilBroken(s){
   setMusic({distort:Math.min(0.9,0.3+sigilsBroken*0.2)}); activateDogs(2); dogRate=Math.max(0.5,1-sigilsBroken*0.15);
   if(s.id==='carousel'){ mons.horses.forEach(h=>h.despawn()); later(1.2,()=>rideRescue('carousel',mons.tyke,s)); }
   if(s.id==='fun'){ mons.mirror.despawn(); later(1.2,()=>rideRescue('fun',mons.mirror,s)); }
+  if(s.id==='coaster'&&sigilsBroken<4) later(2.5,dogNext);
   if(s.id==='pool'){ mons.lifeguard.despawn(); later(1.2,()=>rideRescue('pool',mons.lifeguard,s)); }
   if(!sextonSpawned&&sigilsBroken>=1){ sextonSpawned=true; later(6,()=>{ spawnSexton(); say('You hear someone humming. It is not coming from the speakers.',5); }); }
   if(sigilsBroken===2&&!choir2Spawned){ choir2Spawned=true; later(5,()=>spawnChoir(choirs[1],30,45)); }
   if(sigilsBroken>=4){
-    stage=4; setOrder(); later(0.5,checkpoint); WORLD.gateN.active=false; WORLD.campFire.on=true; lampOn(WORLD.campFire,2);
+    stage=4; setOrder(); later(0.5,checkpoint); later(4,dogNext); WORLD.gateN.active=false; WORLD.campFire.on=true; lampOn(WORLD.campFire,2);
     lamps.filter(l=>l.camp).forEach(l=>lampOn(l,1));
     later(2,()=>{ say('Far to the north, something heavy swings open.',5); noiseBurst(1.5,140,0.7,0.4); });
     later(8,()=>dale('The north gate... Please. Please don\'t go through the maze.',5));
@@ -1451,6 +1473,8 @@ function developShot(){
 addEventListener('keydown',e=>{
   keys[e.code]=true;
   if(e.code==='KeyR'&&dead) respawn();
+  if(paused){ menuKey(e.code); return; }
+  if((e.code==='Escape'||e.code==='KeyP')&&started&&!dead&&!ended){ openMenu(); return; }
   if(!started||dead||ended) return;
   if(e.code==='KeyF'){ flashOn=!flashOn; blip(1400,0.04,'square',0.08); }
   if(e.code==='KeyQ'){ camOn=!camOn&&battery>1; blip(camOn?1900:700,0.05,'square',0.08); applyCam(); }
@@ -1476,7 +1500,7 @@ document.addEventListener('pointerlockchange',()=>{locked=document.pointerLockEl
 addEventListener('mousemove',e=>{
   if(!locked||dead||ended) return;
   if(performance.now()/1000-pad.lastUse<1) return;   // controller in use: ignore mouse-cursor emulation
-  const sens=0.0022/Math.sqrt(zoom);
+  const sens=0.0022*LOOK/Math.sqrt(zoom);
   player.yaw-=e.movementX*sens; player.pitch-=e.movementY*sens; player.pitch=clamp(player.pitch,-1.45,1.45);
 });
 canvas.addEventListener('click',()=>{ if(started&&!locked&&!dead&&!ended) canvas.requestPointerLock(); });
@@ -1519,11 +1543,13 @@ function pollPad(dt){
   if(!gp){ return; }
   const b=i=>!!(gp.buttons[i]&&gp.buttons[i].pressed), hit=i=>b(i)&&!pad.prev[i];
   if(!pad.on){ pad.on=true; const n=$('padnote'); if(n) n.style.display='block'; }
+  if(paused){ menuPad(hit); pad.prev=gp.buttons.map(x=>x.pressed); return; }
+  if(started&&!dead&&!ended&&(hit(9)||hit(8))){ openMenu(); pad.prev=gp.buttons.map(x=>x.pressed); return; }
   if(!started){ if((hit(0)||hit(9))&&!pad.startT) pad.startT=setTimeout(()=>{ if(!started) $('start').click(); },400); }
   else if(dead){ if(hit(0)||hit(9)) fakeKey('KeyR'); }
   else if(!ended){
     pad.fw=-dz(gp.axes[1]||0); pad.st=dz(gp.axes[0]||0);
-    const lx=dz(gp.axes[2]||0), ly=dz(gp.axes[3]||0), rate=2.8/Math.sqrt(zoom);
+    const lx=dz(gp.axes[2]||0), ly=dz(gp.axes[3]||0), rate=2.8*LOOK/Math.sqrt(zoom);
     player.yaw-=lx*Math.abs(lx)*rate*dt; player.pitch=clamp(player.pitch-ly*Math.abs(ly)*rate*dt,-1.45,1.45);
     if(hit(0)) keys.KeyE=true; else if(!b(0)&&pad.prev[0]) keys.KeyE=false;     // A: interact (hold for the long ones)
     keys.ShiftLeft=b(10)||b(4);                                                    // L3 or LB: sprint
@@ -1538,6 +1564,7 @@ function pollPad(dt){
 }
 function update(dt){
   pollPad(dt);
+  if(paused) return;
   tNow+=dt;
   for(let i=events.length-1;i>=0;i--){ if(tNow>=events[i].t){ const f=events[i].fn; events.splice(i,1); f(); } }
   if(!started){ return; }
@@ -1713,7 +1740,7 @@ function tone(type,f,t,dur,vol,att,rel,detune){
   o.connect(g); g.connect(SCORE.lp); o.start(t); o.stop(t+dur+0.05);
 }
 function scoreTick(){
-  if(!AC||!SCORE.on) return;
+  if(!AC||!SCORE.on||paused) return;
   const now=AC.currentTime, ahead=now+0.6, BAR=8, STEP=BAR/16;
   while(SCORE.next<ahead){
     const ch=CHORDS[SCORE.bar%CHORDS.length], t=SCORE.next;
@@ -1738,7 +1765,7 @@ function checkpoint(){ if(dead||ended) return; CP={x:player.pos.x,z:player.pos.z
 function allMons(){ const a=[]; for(const k in mons){ const m=mons[k]; if(Array.isArray(m)) a.push(...m); else if(m) a.push(m); } return a; }
 function respawn(){
   if(!dead) return; if(!CP){ location.reload(); return; }
-  dead=false; $('death').style.display='none';
+  dead=false; $('death').style.display='none'; $('sigloss').style.display='none';
   player.pos.x=CP.x; player.pos.z=CP.z; player.yaw=CP.yaw; player.pitch=0; player.hp=3; player.hurtT=2.5; player.stun=0; player.lastHit=tNow;
   // whatever got you goes back into the dark
   allMons().forEach(m=>{ if(m.active&&Math.hypot(m.g.position.x-player.pos.x,m.g.position.z-player.pos.z)<28) m.retreat(30); });
@@ -1749,7 +1776,7 @@ function respawn(){
 }
 let rumT=18;
 setInterval(()=>{
-  if(!started||dead||ended) return;
+  if(!started||dead||ended||paused) return;
   // health comes back slowly if you stay out of trouble; the red edge shows how hurt you are
   if(player.hp<3&&tNow-(player.lastHit||0)>12){ player.hp++; player.lastHit=tNow; }
   const h=$('hurt'); if(!(player.flashT>0)) h.style.opacity=player.hp>=3?0:(3-player.hp)*0.28;
@@ -1839,11 +1866,13 @@ const carWatcher=(()=>{ const g=new THREE.Group(), skin=lam({color:0xcfc8ba}), d
     mesh(CG(0.05,0.045,2.5,5),skin,0,-1.25,0,a); for(let f=0;f<4;f++) mesh(CG(0.012,0.008,0.5,3),skin,(f-1.5)*0.035,-2.7,0.02,a); });
   g.scale.setScalar(1.3); g.position.set(-1.7,0,112.4); g.rotation.y=Math.PI/2; scene.add(g);
   const glow=new THREE.PointLight(0xcfd8ff,0.9,9,2); glow.position.set(1.2,4.2,112.4); scene.add(glow);   // a cold light catches it
-  g.userData.glow=glow; return g; })();
-let watcherSeen=false;
-setInterval(()=>{ if(!started||!carWatcher.visible) return;
-  if(!watcherSeen&&seenObj(carWatcher.position,4)){ watcherSeen=true; later(0.8,()=>liam('...What is that.',2.5)); }
-  if(stage>=3&&tNow>0&&mons.tyke.active){ carWatcher.visible=false; carWatcher.userData.glow.intensity=0; } },250);
+  g.userData.glow=glow; g.visible=false; glow.intensity=0; return g; })();
+let watcherSeen=false, watcherT=0;
+setInterval(()=>{ if(!started||paused||!carWatcher.visible) return;
+  const seen=seenObj(carWatcher.position,4), near=Math.hypot(player.pos.x-carWatcher.position.x,player.pos.z-carWatcher.position.z)<14;
+  if(seen&&!watcherSeen){ watcherSeen=true; later(0.8,()=>liam('...What is that.',2.5)); }
+  if(watcherSeen&&!seen) watcherT+=0.25; else watcherT=0;
+  if(near||watcherT>3){ carWatcher.visible=false; carWatcher.userData.glow.intensity=0; } },250);
 
 // ---------- the dog saves you, using the ride you just fixed ----------
 let rideSpin=0, RESCUE=null;
@@ -1859,6 +1888,7 @@ function rideRescue(kind,m,sig){
   RESCUE={kind,m,t:0,start:g.position.clone(),sig,dogPlaced:false};
 }
 setInterval(()=>{
+  if(paused) return;
   rideSpin=Math.max(0,rideSpin-0.05*6);
   const R=RESCUE; if(!R) return; const dt=0.05; R.t+=dt; const g=R.m.g, p=g.position;
   if(dead||ended){ g.visible=false; RESCUE=null; return; }
@@ -1896,8 +1926,8 @@ function hollowSay(m,text){ const who=HOLLOW[text]||'teenA', pos={x:m.g.position
 // ---------- the dog, right behind you, pointing the way ----------
 let behindCD=20;
 setInterval(()=>{ behindCD=Math.max(0,behindCD-0.5); },500);
-function tryBehind(d,target){
-  if(behindCD>0||Math.random()>0.33||dead||ended||!target) return false;
+function tryBehind(d,target,force){
+  if((!force&&(behindCD>0||Math.random()>0.33))||dead||ended||!target) return false;
   const bx=player.pos.x+Math.sin(player.yaw)*2.6, bz=player.pos.z+Math.cos(player.yaw)*2.6;   // directly behind you
   if(pointBlocked(bx,bz)||seenPoint(_t.set(bx,1.6,bz))) return false;
   placeDog(d,bx,0,bz,{silent:true});                     // faces you
@@ -1912,6 +1942,94 @@ let sigilRemark=false;
 setInterval(()=>{ if(sigilRemark||!started||dead||ended||stage!==3) return;
   for(const sg of WORLD.sigils){ if(sg.broken) continue; const d=Math.hypot(sg.x-player.pos.x,sg.z-player.pos.z);
     if(d<18&&seenPoint(_t.set(sg.x,(sg.y||0)+0.5,sg.z))){ sigilRemark=true; liam('Ugh. Great. These kids are tanking the sell value.',4); return; } } },300);
+
+// ---------- pause menu ----------
+let paused=false, menuSel=0, LOOK=1, VOL=0.9;
+try{ const sv=JSON.parse(localStorage.getItem('dw_opts')||'{}'); if(sv.look) LOOK=sv.look; if(sv.vol!=null) VOL=sv.vol; }catch(e){}
+const saveOpts=()=>{ try{ localStorage.setItem('dw_opts',JSON.stringify({look:LOOK,vol:VOL})); }catch(e){} };
+const applyVol=()=>{ if(master) master.gain.value=VOL; };
+const MENU=[
+  {t:()=>'Resume', go:()=>closeMenu()},
+  {t:()=>'Restart from checkpoint', go:()=>{ closeMenu(); if(CP){ dead=true; respawn(); } }},
+  {t:()=>'Look sensitivity  < '+LOOK.toFixed(1)+' >', adj:d=>{ LOOK=Math.round(clamp(LOOK+d*0.1,0.3,2.5)*10)/10; saveOpts(); }},
+  {t:()=>'Volume  < '+Math.round(VOL/0.9*100)+'% >', adj:d=>{ VOL=clamp(VOL+d*0.09,0,1.35); applyVol(); saveOpts(); }},
+  {t:()=>'Controls', go:()=>{ const h=$('mhelp'); h.style.display=h.style.display==='block'?'none':'block'; }},
+  {t:()=>'Quit to title', go:()=>location.reload()},
+];
+function drawMenu(){
+  $('mitems').innerHTML=MENU.map((m,i)=>'<div class="it'+(i===menuSel?' sel':'')+'" data-i="'+i+'">'+m.t()+'</div>').join('');
+  $('mhint').textContent=pad.on?'D-pad: move / change   A: select   B or Menu: resume':'Mouse or arrow keys: move / change   Enter: select   Esc: resume';
+  $('mhelp').innerHTML=pad.on
+    ?'Left stick: move &nbsp; Right stick: look<br>A: interact (hold) &nbsp; X: flashlight<br>Y: body cam &nbsp; RT: photo &nbsp; D-pad: zoom<br>LB: sprint (loud) &nbsp; B: crouch (quiet)'
+    :'WASD: move &nbsp; Mouse: look<br>E: interact (hold) &nbsp; F: flashlight<br>Q: body cam &nbsp; Click: photo &nbsp; Scroll: zoom<br>Shift: sprint (loud) &nbsp; C: crouch (quiet)';
+}
+function openMenu(){ if(paused||!started||dead||ended) return; paused=true; menuSel=0; $('mhelp').style.display='none'; drawMenu(); $('menu').style.display='flex'; try{document.exitPointerLock();}catch(e){} if(AC&&AC.state==='running') AC.suspend(); }
+function closeMenu(){ if(!paused) return; paused=false; $('menu').style.display='none'; if(AC&&AC.state==='suspended') AC.resume(); try{ const r=canvas.requestPointerLock(); if(r&&r.catch) r.catch(()=>{}); }catch(e){} }
+function menuMove(d){ menuSel=(menuSel+d+MENU.length)%MENU.length; blip(700,0.03,'square',0.03); drawMenu(); }
+function menuAdj(d){ const m=MENU[menuSel]; if(m.adj){ m.adj(d); drawMenu(); } }
+function menuGo(){ const m=MENU[menuSel]; if(m.go) m.go(); else if(m.adj) m.adj(1); if(paused) drawMenu(); }
+function menuPad(hit){ if(hit(12)) menuMove(-1); if(hit(13)) menuMove(1); if(hit(14)) menuAdj(-1); if(hit(15)) menuAdj(1); if(hit(0)) menuGo(); if(hit(1)||hit(9)||hit(8)) closeMenu(); }
+function menuKey(c){ if(c==='ArrowUp'||c==='KeyW') menuMove(-1); else if(c==='ArrowDown'||c==='KeyS') menuMove(1); else if(c==='ArrowLeft'||c==='KeyA') menuAdj(-1); else if(c==='ArrowRight'||c==='KeyD') menuAdj(1); else if(c==='Enter'||c==='Space') menuGo(); else if(c==='Escape'||c==='KeyP') closeMenu(); }
+$('mitems').addEventListener('mousemove',e=>{ const it=e.target.closest('.it'); if(it&&+it.dataset.i!==menuSel){ menuSel=+it.dataset.i; drawMenu(); } });
+$('mitems').addEventListener('click',e=>{ const it=e.target.closest('.it'); if(!it) return; menuSel=+it.dataset.i; const m=MENU[menuSel];
+  if(m.adj){ const r=it.getBoundingClientRect(); m.adj(e.clientX<r.left+r.width/2?-1:1); drawMenu(); } else menuGo(); });
+// Esc on PC releases the mouse first: treat losing the mouse mid-game as "pause"
+document.addEventListener('pointerlockchange',()=>{ if(!document.pointerLockElement&&started&&!dead&&!ended&&!paused&&!pad.on) openMenu(); });
+$('dcont').addEventListener('click',()=>respawn());
+setTimeout(applyVol,0); addEventListener('click',()=>setTimeout(applyVol,50),{once:true});
+
+// ---------- one monster at a time ----------
+// Whatever shows up newest takes over; the rest wait out of sight. Every so often a different one takes a turn,
+// so you never know which one is out there.
+const HUNT={cur:null,since:0,idle:0};
+function huntList(){
+  const L=[];
+  allMons().forEach(m=>{ if(m===(RESCUE&&RESCUE.m)) return; L.push({o:m,on:()=>m.active,
+    bench:()=>{ m.benched=true; m.active=false; m.g.visible=false; },
+    wake:()=>{ m.benched=false; m.active=true; m.g.visible=true; m.retreat(30); }}); });
+  choirs.forEach((c,ci)=>L.push({o:c,on:()=>c.active,
+    bench:()=>{ c.benched=true; c.active=false; c.g.visible=false; if(ci===0&&choirVoice) choirVoice.gain.gain.value=0; },
+    wake:()=>{ c.benched=false; c.active=true; c.g.visible=true; c.state='patrol'; }}));
+  L.push({o:sexton,on:()=>sexton.active,
+    bench:()=>{ sexton.benched=true; sexton.active=false; if(sexton.g) sexton.g.visible=false; if(sextonVoice) sextonVoice.gain.gain.value=0; },
+    wake:()=>{ sexton.benched=false; spawnSexton(); }});
+  return L;
+}
+setInterval(()=>{
+  if(!started||dead||ended||paused) return;
+  const L=huntList(), on=L.filter(e=>e.on()), cur=L.find(e=>e.o===HUNT.cur);
+  // a newly appeared monster becomes the one; everything else steps back into the dark
+  const fresh=on.filter(e=>e.o!==HUNT.cur);
+  if(fresh.length){ const pick=fresh[fresh.length-1]; HUNT.cur=pick.o; HUNT.since=tNow; on.forEach(e=>{ if(e!==pick) e.bench(); }); return; }
+  if(cur&&cur.on()){ HUNT.idle=0;
+    // after a while, quietly swap who's hunting you
+    const benched=L.filter(e=>e.o.benched);
+    if(tNow-HUNT.since>80&&benched.length){ cur.bench(); const n=benched[Math.floor(Math.random()*benched.length)]; n.wake(); HUNT.cur=n.o; HUNT.since=tNow; }
+    return; }
+  // the hunter is gone: after a breather, one of the waiting ones comes out
+  HUNT.cur=null; HUNT.idle+=0.5; const benched=L.filter(e=>e.o.benched);
+  if(benched.length&&HUNT.idle>12+Math.random()*10){ const n=benched[Math.floor(Math.random()*benched.length)]; n.wake(); HUNT.cur=n.o; HUNT.since=tNow; HUNT.idle=0; }
+},500);
+
+
+// carousel horses ride up and down on their poles once the power is on
+WORLD.horsePoles.forEach((h,k)=>{ h.userData.baseY=h.position.y; });
+setInterval(()=>{ if(!powered||paused) return; const sp=1+rideSpin*0.4;
+  WORLD.horsePoles.forEach((h,k)=>{ h.position.y=h.userData.baseY+Math.sin(tNow*1.6*sp+k*1.9)*0.28; }); },50);
+
+// ---------- the dog: shows up after you finish something, pointing at what's next ----------
+function nextTarget(){ if(stage===1){ const t=photoTargets.find(t=>!t.done); return t?t.pos:null; } try{ return guideTarget(); }catch(e){ return null; } }
+function dogNext(){
+  if(dead||ended) return; const d=dogs[1], tg=nextTarget(); if(!d||!tg) return;
+  d.active=true; d.mode='guide'; d.unseen=0; d.wasSeen=false;
+  if(Math.random()<0.5&&tryBehind(d,tg,true)) return;          // half the time: right behind you
+  guidePlace(d,tg);                                              // otherwise: ahead of you, pointing the way
+}
+// certain spots: the first time you near each new objective, he may be waiting by it
+const dogAt=new Set();
+setInterval(()=>{ if(!started||dead||ended||paused||stage<1) return; const d=dogs[1], tg=nextTarget(); if(!d||!tg||d.g.visible) return;
+  const key=Math.round(tg.x)+','+Math.round(tg.z); if(dogAt.has(key)) return;
+  if(Math.hypot(tg.x-player.pos.x,tg.z-player.pos.z)<32){ dogAt.add(key); if(Math.random()<0.6){ d.active=true; d.mode='guide'; d.unseen=0; d.wasSeen=false; guidePlace(d,tg); } } },500);
 </script>
 </body>
 </html>
