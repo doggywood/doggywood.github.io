@@ -2123,10 +2123,10 @@ setInterval(()=>{
   }
   const want=clamp(1-(near-4)/22,0,1); FUZZ+=(want-FUZZ)*0.15; const a=FUZZ;
   const cv=canvas; const base=camOn?'grayscale(1) sepia(.8) hue-rotate(55deg) saturate(1.7) brightness(1.45) contrast(1.12) ':'';
-  cv.style.filter=a>0.02?base+'blur('+(a*1.6).toFixed(2)+'px) contrast('+(1+a*0.35).toFixed(2)+')':'';
+  cv.style.filter=a>0.02?base+'blur('+(a*1.6).toFixed(2)+'px) contrast('+(1+a*0.25).toFixed(2)+') brightness('+(1-a*0.22).toFixed(2)+')':'';   // scrambles and darkens, never brightens
   cv.style.transform=a>0.05?'translate('+((Math.random()-0.5)*a*7).toFixed(1)+'px,'+((Math.random()-0.5)*a*3).toFixed(1)+'px)':'';
-  $('grain').style.opacity=(camOn?0.22:0.06)+a*0.32;
-  $('glitch').style.opacity=a>0.25&&Math.random()<a*0.6?a:0;
+  $('grain').style.opacity=(camOn?0.22:0.06)+a*0.06;
+  $('glitch').style.opacity=a>0.3&&Math.random()<a*0.5?a*0.45:0;
   if(AC&&master){ if(!fuzzHiss){ const n=AC.createBufferSource(); n.buffer=noiseBuf; n.loop=true; const bp=AC.createBiquadFilter(); bp.type='bandpass'; bp.frequency.value=3000; bp.Q.value=0.5;
       const g=AC.createGain(); g.gain.value=0; n.connect(bp); bp.connect(g); g.connect(master); n.start(); fuzzHiss=g; }
     fuzzHiss.gain.setTargetAtTime(a*a*0.09*(0.6+Math.random()*0.8),AC.currentTime,0.05); }
@@ -2278,6 +2278,16 @@ function grabGear(){
   later(1,checkpoint); later(2.6,()=>liam('Okay. Doggywood Park. In and out.'));
   later(6,()=>dale('Liam? You in? Gate\'s open. Plaza\'s straight ahead. Start with the ticket booth.',6));
 }
+
+// ---------- no glow may ever fill the screen: every glowing sprite fades as the camera gets close to it ----------
+const _gw=new THREE.Vector3();
+function tameGlow(sp){ if(sp.userData.tamed) return; sp.userData.tamed=true;
+  sp.onBeforeRender=(r,sc,cam)=>{ sp.getWorldPosition(_gw); const size=Math.max(sp.scale.x,sp.scale.y)*(sp.parent&&sp.parent.scale?sp.parent.scale.x:1);
+    const d=cam.position.distanceTo(_gw), k=Math.min(1,Math.max(0,(d-size*0.45)/(size*0.9)));
+    sp.userData.op=sp.material.opacity; sp.material.opacity=sp.userData.op*k; };
+  sp.onAfterRender=()=>{ if(sp.userData.op!=null) sp.material.opacity=sp.userData.op; }; }
+function tameAll(){ scene.traverse(o=>{ if(o.isSprite) tameGlow(o); }); }
+tameAll(); setInterval(tameAll,2000);
 </script>
 </body>
 </html>
