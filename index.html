@@ -1796,7 +1796,7 @@ function playVoice(who,text){
   if(!AC) return; const fn=VOX[who+'|'+text]; if(!fn) return;
   const go=buf=>{ try{ if(voxSrc) voxSrc.stop(); }catch(e){}
     const src=AC.createBufferSource(); src.buffer=buf; let node=src;
-    const g=AC.createGain(); g.gain.value=who==='dale'?1.5:1.0;
+    const g=AC.createGain(); g.gain.value=who==='dale'?0.75:1.0;
     if(who==='dale'){ const hp=AC.createBiquadFilter(); hp.type='highpass'; hp.frequency.value=380; const lp=AC.createBiquadFilter(); lp.type='lowpass'; lp.frequency.value=3200;
       const ws=AC.createWaveShaper(); const c=new Float32Array(256); for(let i=0;i<256;i++){ const x=i/128-1; c[i]=Math.tanh(x*2.2); } ws.curve=c;
       node.connect(hp); hp.connect(lp); lp.connect(ws); node=ws; noiseBurst(0.12,2400,0.12,1); setTimeout(()=>noiseBurst(0.1,2400,0.1,1),buf.duration*1000+80); }
