@@ -1381,7 +1381,7 @@ function photoTaken(t){
   t.done=true; if(photosTaken===0) later(0.8,()=>liam('One for the file.')); if(photosTaken===2) later(0.6,()=>liam('That\'s the last photo.')); photosTaken++; setOrder(); shotWait=3; if(photosTaken>=2) later(2.5,dogNext);
   if(photosTaken===1){
     later(4,()=>{ musicDuck(4); }); later(5,()=>{ const d=dogs[0]; d.active=true; placeDog(d,11,3.35,-52,{away:false}); });
-    later(7,()=>dale('Mm. You get a good shot? ...The park had a mascot. A dog. If you see one of the old suits, don\'t let it bother you.',6));
+    later(7,()=>dale('Mm. You get a good shot? ...The park had a mascot. A dog. If you see one of the old suits, don\'t let it bother you. He still knows the park well. If he\'s pointing somewhere, I\'d follow it.',11));
   } else if(photosTaken===2){
     later(3,kidsEvent);
   } else if(photosTaken===3){
@@ -2087,7 +2087,6 @@ function nextTarget(){ if(stage===1){ const t=photoTargets.find(t=>!t.done); ret
 let dogExplained=false;
 function dogNext(){
   if(dead||ended) return; const d=dogs[1], tg=nextTarget(); if(!d||!tg) return;
-  if(!dogExplained&&!daleTaken){ dogExplained=true; later(6,()=>{ if(!daleTaken) dale('Saw the mascot, huh? Old staff swore that dog always pointed lost kids the right way. If he\'s pointing, I\'d follow it.',7); }); }
   d.active=true; d.mode='guide'; d.unseen=0; d.wasSeen=false;
   if(Math.random()<0.5&&tryBehind(d,tg,true)) return;          // half the time: right behind you
   guidePlace(d,tg);                                              // otherwise: ahead of you, pointing the way
