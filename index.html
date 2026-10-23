@@ -1796,11 +1796,25 @@ function playVoice(who,text){
   if(!AC) return; const fn=VOX[who+'|'+text]; if(!fn) return;
   const go=buf=>{ try{ if(voxSrc) voxSrc.stop(); }catch(e){}
     const src=AC.createBufferSource(); src.buffer=buf; let node=src;
-    const g=AC.createGain(); g.gain.value=who==='dale'?0.75:1.0;
-    if(who==='dale'){ const hp=AC.createBiquadFilter(); hp.type='highpass'; hp.frequency.value=380; const lp=AC.createBiquadFilter(); lp.type='lowpass'; lp.frequency.value=3200;
-      const ws=AC.createWaveShaper(); const c=new Float32Array(256); for(let i=0;i<256;i++){ const x=i/128-1; c[i]=Math.tanh(x*2.2); } ws.curve=c;
-      node.connect(hp); hp.connect(lp); lp.connect(ws); node=ws; noiseBurst(0.12,2400,0.12,1); setTimeout(()=>noiseBurst(0.1,2400,0.1,1),buf.duration*1000+80); }
-    node.connect(g); g.connect(master); src.start(); voxSrc=src; };
+    const g=AC.createGain(); g.gain.value=who==='dale'?0.55:1.0;
+    let t0=AC.currentTime;
+    if(who==='dale'){
+      // walkie-talkie: key-in click + squelch, light grit (keeps his voice dynamic), static under him, squelch tail when he lets go
+      const hp=AC.createBiquadFilter(); hp.type='highpass'; hp.frequency.value=320; const lp=AC.createBiquadFilter(); lp.type='lowpass'; lp.frequency.value=3400;
+      const ws=AC.createWaveShaper(); const c=new Float32Array(256); for(let i=0;i<256;i++){ const x=i/128-1; c[i]=Math.tanh(x*1.25)/Math.tanh(1.25); } ws.curve=c;
+      node.connect(hp); hp.connect(lp); lp.connect(ws); node=ws;
+      const out=AC.createGain(); out.gain.value=1; out.connect(master);
+      const click=(t,f,v)=>{ const o=AC.createOscillator(), og=AC.createGain(); o.type='square'; o.frequency.value=f; og.gain.setValueAtTime(v,t); og.gain.exponentialRampToValueAtTime(0.0001,t+0.025); o.connect(og); og.connect(out); o.start(t); o.stop(t+0.03); };
+      const hiss=(t,dur,v,freq,crackle)=>{ const n=AC.createBufferSource(); n.buffer=noiseBuf; n.loop=true; const bp=AC.createBiquadFilter(); bp.type='bandpass'; bp.frequency.value=freq; bp.Q.value=0.7; const ng=AC.createGain(); ng.gain.setValueAtTime(0,t);
+        if(crackle){ for(let k=0;k*0.05<dur;k++) ng.gain.setValueAtTime(v*(0.45+Math.random()*0.9)*(Math.random()<0.06?2.4:1),t+k*0.05); } else { ng.gain.linearRampToValueAtTime(v,t+0.01); }
+        ng.gain.setValueAtTime(ng.gain.value,t+dur); ng.gain.linearRampToValueAtTime(0,t+dur+0.03); n.connect(bp); bp.connect(ng); ng.connect(out); n.start(t,Math.random()); n.stop(t+dur+0.05); };
+      click(t0,1100,0.12); hiss(t0+0.01,0.16,0.09,2200,false);           // key in
+      t0+=0.22;
+      hiss(t0,buf.duration+0.05,0.022,1900,true);                         // static under his voice
+      const te=t0+buf.duration+0.06; hiss(te,0.24,0.08,2600,false); click(te+0.24,900,0.1);   // key out
+      node.connect(g); g.connect(out); src.start(t0); voxSrc=src; return;
+    }
+    node.connect(g); g.connect(master); src.start(t0); voxSrc=src; };
   if(voxCache[fn]) go(voxCache[fn]);
   else fetch('voice/'+fn).then(r=>r.arrayBuffer()).then(b=>AC.decodeAudioData(b)).then(buf=>{ voxCache[fn]=buf; go(buf); }).catch(()=>{});
 }
