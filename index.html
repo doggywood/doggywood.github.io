@@ -44,7 +44,7 @@
 <body>
 <canvas id="c"></canvas>
 <div id="camlines"></div>
-<canvas id="grain" width="80" height="45"></canvas>
+<canvas id="grain" width="320" height="180"></canvas>
 <div id="scan"></div><div id="vig"></div><div id="glitch"></div>
 <div id="hurt"></div><div id="flashfx"></div>
 <div id="hud">
@@ -1446,7 +1446,7 @@ addEventListener('keydown',e=>{
 });
 addEventListener('keyup',e=>{keys[e.code]=false;});
 function applyCam(){
-  canvas.classList.toggle('cam',camOn); $('rec').style.display=camOn?'block':'none'; $('grain').style.opacity=camOn?0.03:0.06; $('camlines').style.display=camOn?'block':'none';
+  canvas.classList.toggle('cam',camOn); $('rec').style.display=camOn?'block':'none'; $('grain').style.opacity=camOn?0.22:0.06; $('camlines').style.display=camOn?'block':'none';
   WORLD.camThings.forEach(c=>c.visible=camOn||c.userData.near); amb.intensity=camOn?1.35:0.95;
   if(!camOn) zoomTarget=1;
 }
@@ -1652,7 +1652,7 @@ function revealBodies(){
 }
 
 // ---------- film grain ----------
-const gcv=$('grain'), gctx=gcv.getContext('2d'); const gimg=gctx.createImageData(80,45);
+const gcv=$('grain'), gctx=gcv.getContext('2d'); const gimg=gctx.createImageData(320,180);
 function grain(){ const d=gimg.data; for(let i=0;i<d.length;i+=4){ const v=Math.random()*255; d[i]=d[i+1]=d[i+2]=v; d[i+3]=255; } gctx.putImageData(gimg,0,0); }
 
 // ---------- boot ----------
