@@ -19,6 +19,7 @@ for who,lines in [('dale',dale),('liam',liam)]+list(teens.items()):
     if os.path.exists(path) and os.path.getsize(path)>2000: continue
     v,rate,pitch=VO[who]
     spoken=t.replace('--','...')
+    if spoken.startswith('Mm.'): spoken='Mmmm...'+spoken[3:]   # a hum, not the letters M M
     import time
     for attempt in range(5):
       r=subprocess.run([sys.executable,'-m','edge_tts','--voice',v,'--rate='+rate,'--pitch='+pitch,'--text',spoken,'--write-media',path],capture_output=True,text=True)

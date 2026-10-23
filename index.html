@@ -112,32 +112,32 @@ const camera=new THREE.PerspectiveCamera(72,16/9,0.1,320);
 scene.add(camera);
 const BASE_FOV=72; let zoom=1;
 // post pass: renders the scene to a texture, then draws it with the camera look / fuzz in a shader
-const POST={rt:null,scene:null,cam:null,mat:null,fuzz:0,resizeLater:false};
+const POST={rt:null,scene:null,cam:null,mat:null,fuzz:0,rows:270};
 function setupPost(){
   POST.rt=new THREE.WebGLRenderTarget(4,4,{minFilter:THREE.NearestFilter,magFilter:THREE.NearestFilter});
-  POST.mat=new THREE.ShaderMaterial({uniforms:{t:{value:POST.rt.texture},cam:{value:0},fuzz:{value:0},res:{value:new THREE.Vector2(4,4)}},
+  POST.mat=new THREE.ShaderMaterial({uniforms:{t:{value:POST.rt.texture},cam:{value:0},fuzz:{value:0},rows:{value:270},res:{value:new THREE.Vector2(4,4)}},
     vertexShader:'varying vec2 vUv; void main(){ vUv=uv; gl_Position=vec4(position.xy,0.,1.); }',
-    fragmentShader:'uniform sampler2D t; uniform float cam; uniform float fuzz; uniform vec2 res; varying vec2 vUv;\n'+
-      'void main(){ vec3 c=texture2D(t,vUv).rgb;\n'+
-      ' if(fuzz>0.01){ vec2 o=vec2(fuzz*2.5/res.x,0.); vec2 q=vec2(0.,fuzz*1.5/res.y); c=(c+texture2D(t,vUv+o).rgb+texture2D(t,vUv-o).rgb+texture2D(t,vUv+q).rgb)*0.25; c=(c-0.5)*(1.+fuzz*0.25)+0.5; c*=1.-fuzz*0.22; }\n'+
+    fragmentShader:'uniform sampler2D t; uniform float cam; uniform float fuzz; uniform float rows; uniform vec2 res; varying vec2 vUv;\n'+
+      'void main(){ vec2 px=vec2(floor(rows*res.x/res.y+0.5),rows); vec2 uv=rows<res.y-1.0?(floor(vUv*px)+0.5)/px:vUv; vec3 c=texture2D(t,uv).rgb;\n'+
+      ' if(fuzz>0.01){ vec2 o=vec2(fuzz*2.5/px.x,0.); vec2 q=vec2(0.,fuzz*1.5/px.y); c=(c+texture2D(t,uv+o).rgb+texture2D(t,uv-o).rgb+texture2D(t,uv+q).rgb)*0.25; c=(c-0.5)*(1.+fuzz*0.25)+0.5; c*=1.-fuzz*0.22; }\n'+
       ' if(cam>0.5){ float l=dot(c,vec3(0.299,0.587,0.114)); c=vec3(l*0.80,l*1.04,l*0.76)*1.45; c=(c-0.5)*1.12+0.5; }\n'+
       ' gl_FragColor=vec4(clamp(c,0.,1.),1.); }',depthTest:false,depthWrite:false});
   POST.scene=new THREE.Scene(); POST.cam=new THREE.Camera(); POST.scene.add(new THREE.Mesh(new THREE.PlaneGeometry(2,2),POST.mat));
 }
 function renderMain(){
   if(!POST.rt) setupPost();
-  const need=camOn||POST.fuzz>0.02;
-  if(!need){ renderer.render(scene,camera); return; }
   const sz=renderer.getSize(new THREE.Vector2()); if(POST.rt.width!==sz.x||POST.rt.height!==sz.y){ POST.rt.setSize(sz.x,sz.y); POST.mat.uniforms.res.value.set(sz.x,sz.y); }
-  POST.mat.uniforms.cam.value=camOn?1:0; POST.mat.uniforms.fuzz.value=POST.fuzz;
+  POST.mat.uniforms.cam.value=camOn?1:0; POST.mat.uniforms.fuzz.value=POST.fuzz; POST.mat.uniforms.rows.value=Math.min(POST.rows,sz.y);
   renderer.setRenderTarget(POST.rt); renderer.render(scene,camera); renderer.setRenderTarget(null); renderer.render(POST.scene,POST.cam);
 }
-let resH=270;
+let resH=540;   // fixed: the drawing surface is never resized mid-game (that was blanking the screen)
 function resize(){
   const h=resH, w=Math.round(h*innerWidth/innerHeight);
   renderer.setSize(w,h,false);
   camera.aspect=w/h; camera.updateProjectionMatrix();
 }
+canvas.addEventListener('webglcontextlost',e=>{ e.preventDefault(); },false);
+canvas.addEventListener('webglcontextrestored',()=>{ POST.rt=null; resize(); },false);
 addEventListener('resize',resize); resize();
 
 const amb=new THREE.AmbientLight(0x3a4668,0.95); scene.add(amb);
@@ -1690,7 +1690,7 @@ function update(dt){
   zoom+=(zoomTarget-zoom)*Math.min(1,dt*6); camera.fov=BASE_FOV/zoom; camera.updateProjectionMatrix();
   { let want=camOn?(zoom>2.4?720:540):270;
     if(camOn&&monsterInFrame()) want=zoom<1.4?300:zoom<2.2?150:zoom<3.5?84:zoom<5?52:36;   // you can't study them through the lens
-    if(want!==resH){ resH=want; resize(); } }
+    POST.rows=want; }
   camera.updateMatrixWorld(true); updateListener();
   flash.visible=flashOn&&!ended; flash.color.set(camOn?0xb8ffc8:0xfff0cc); flash.angle=0.46/Math.max(1,zoom*0.6);
   // trail for the Sexton
