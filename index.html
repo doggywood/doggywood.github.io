@@ -7,7 +7,7 @@
 <style>
   html,body{margin:0;height:100%;background:#000;overflow:hidden;font-family:"Courier New",monospace;color:#d8ffe0;user-select:none}
   #c{position:fixed;inset:0;width:100%;height:100%;image-rendering:pixelated;transition:filter .15s}
-  #c.cam{filter:grayscale(1) sepia(.8) hue-rotate(55deg) saturate(1.7) brightness(1.45) contrast(1.12)}
+  #c.cam{}   /* the green camera look is drawn by the renderer now (CSS filters on the canvas flashed white on some devices) */
   #camlines{position:fixed;inset:0;pointer-events:none;display:none;background:repeating-linear-gradient(0deg,rgba(0,0,0,.32) 0,rgba(0,0,0,.32) 2px,transparent 2px,transparent 5px);animation:cl 1.4s linear infinite}
   #camlines::after{content:'';position:absolute;left:0;right:0;height:14%;background:linear-gradient(rgba(180,255,190,0),rgba(180,255,190,.10),rgba(180,255,190,0));animation:roll 5s linear infinite}
   @keyframes cl{to{background-position:0 5px}}
@@ -111,6 +111,27 @@ scene.fog=new THREE.FogExp2(FOG_COL,0.02);
 const camera=new THREE.PerspectiveCamera(72,16/9,0.1,320);
 scene.add(camera);
 const BASE_FOV=72; let zoom=1;
+// post pass: renders the scene to a texture, then draws it with the camera look / fuzz in a shader
+const POST={rt:null,scene:null,cam:null,mat:null,fuzz:0,resizeLater:false};
+function setupPost(){
+  POST.rt=new THREE.WebGLRenderTarget(4,4,{minFilter:THREE.NearestFilter,magFilter:THREE.NearestFilter});
+  POST.mat=new THREE.ShaderMaterial({uniforms:{t:{value:POST.rt.texture},cam:{value:0},fuzz:{value:0},res:{value:new THREE.Vector2(4,4)}},
+    vertexShader:'varying vec2 vUv; void main(){ vUv=uv; gl_Position=vec4(position.xy,0.,1.); }',
+    fragmentShader:'uniform sampler2D t; uniform float cam; uniform float fuzz; uniform vec2 res; varying vec2 vUv;\n'+
+      'void main(){ vec3 c=texture2D(t,vUv).rgb;\n'+
+      ' if(fuzz>0.01){ vec2 o=vec2(fuzz*2.5/res.x,0.); vec2 q=vec2(0.,fuzz*1.5/res.y); c=(c+texture2D(t,vUv+o).rgb+texture2D(t,vUv-o).rgb+texture2D(t,vUv+q).rgb)*0.25; c=(c-0.5)*(1.+fuzz*0.25)+0.5; c*=1.-fuzz*0.22; }\n'+
+      ' if(cam>0.5){ float l=dot(c,vec3(0.299,0.587,0.114)); c=vec3(l*0.80,l*1.04,l*0.76)*1.45; c=(c-0.5)*1.12+0.5; }\n'+
+      ' gl_FragColor=vec4(clamp(c,0.,1.),1.); }',depthTest:false,depthWrite:false});
+  POST.scene=new THREE.Scene(); POST.cam=new THREE.Camera(); POST.scene.add(new THREE.Mesh(new THREE.PlaneGeometry(2,2),POST.mat));
+}
+function renderMain(){
+  if(!POST.rt) setupPost();
+  const need=camOn||POST.fuzz>0.02;
+  if(!need){ renderer.render(scene,camera); return; }
+  const sz=renderer.getSize(new THREE.Vector2()); if(POST.rt.width!==sz.x||POST.rt.height!==sz.y){ POST.rt.setSize(sz.x,sz.y); POST.mat.uniforms.res.value.set(sz.x,sz.y); }
+  POST.mat.uniforms.cam.value=camOn?1:0; POST.mat.uniforms.fuzz.value=POST.fuzz;
+  renderer.setRenderTarget(POST.rt); renderer.render(scene,camera); renderer.setRenderTarget(null); renderer.render(POST.scene,POST.cam);
+}
 let resH=270;
 function resize(){
   const h=resH, w=Math.round(h*innerWidth/innerHeight);
@@ -399,7 +420,7 @@ function stopMusicBox(){ clearInterval(boxTimer); boxTimer=null; }
 
 // ---------- MUSIC (your tracks in /music) ----------
 const localSongs=[];   // songs picked from this device: never uploaded anywhere
-const music={buffers:[],idx:0,src:null,vol:0.55,duck:1,talk:1,distort:0,ready:false,names:[],playing:false};
+const music={buffers:[],idx:0,src:null,vol:0.55,duck:1,talk:1,ramp:0.4,distort:0,ready:false,names:[],playing:false};
 let mLP,mHP,mGain,mDelay,mFb,mPan,mWob,mLFO,mShape,mSend;
 function initMusic(){
   mHP=AC.createBiquadFilter(); mHP.type='highpass'; mHP.frequency.value=180;
@@ -440,7 +461,7 @@ function playNextTrack(){
 }
 function applyMusic(){
   if(!AC||!mGain) return; const d=music.distort, t=AC.currentTime;
-  mGain.gain.cancelScheduledValues(t); mGain.gain.linearRampToValueAtTime(music.vol*music.duck*music.talk,t+0.4);
+  mGain.gain.cancelScheduledValues(t); mGain.gain.setValueAtTime(mGain.gain.value,t); mGain.gain.linearRampToValueAtTime(music.vol*music.duck*music.talk,t+music.ramp);
   mLP.frequency.linearRampToValueAtTime(4200-3300*d,t+1.5);
   mHP.frequency.linearRampToValueAtTime(180+d*120,t+1.5);
   mWob.gain.linearRampToValueAtTime(0.004+0.03*d,t+1.5);
@@ -691,6 +712,17 @@ const WORLD={
       maze:{x0:-15,z0:-87,n:10,cell:5}, camp:{x:12,z:-188}, service:{x:95,z:45}, fountain:{x:0,z:40} },
 };
 const _g=THREE;
+// cobblestones: rounded stones in uneven rows with dark gaps
+const COBBLE=(()=>{ const c=document.createElement('canvas'); c.width=c.height=256; const g=c.getContext('2d');
+  g.fillStyle='#1b1a19'; g.fillRect(0,0,256,256);
+  for(let row=0;row<8;row++){ let x=-Math.random()*20; const y=row*32+16;
+    while(x<276){ const w=22+Math.random()*16, h=24+Math.random()*6, v=70+Math.random()*40|0;
+      for(const ox of [0,-256,256]){ g.fillStyle='rgb('+v+','+(v-6)+','+(v-12)+')'; g.beginPath(); g.ellipse(x+w/2+ox,y+(Math.random()-0.5)*4,w/2-2,h/2-2,0,0,7); g.fill();
+        g.fillStyle='rgba(255,255,255,.07)'; g.beginPath(); g.ellipse(x+w/2-3+ox,y-4,w/2-7,h/2-9,0,0,7); g.fill(); }
+      x+=w+2; } }
+  for(let k=0;k<900;k++){ g.fillStyle='rgba(0,0,0,'+(Math.random()*0.25)+')'; g.fillRect(Math.random()*256,Math.random()*256,2,2); }
+  return c; })();
+function cobbleMat(w,d){ const t=new THREE.CanvasTexture(COBBLE); t.wrapS=t.wrapT=THREE.RepeatWrapping; t.repeat.set(w/2.1,d/2.1); t.magFilter=THREE.NearestFilter; return new THREE.MeshLambertMaterial({map:t}); }
 function plane(x,y,z,w,d,mat,ry){ const m=new _g.Mesh(new _g.PlaneGeometry(w,d),mat); m.rotation.x=-Math.PI/2; if(ry) m.rotation.z=ry; m.position.set(x,y,z); scene.add(m); return m; }
 function signTex(text,bg,fg,w,h,fs){
   w=w||128;h=h||48; const c=document.createElement('canvas'); c.width=w; c.height=h;
@@ -722,9 +754,9 @@ function buildWorld(){
   // ---- ground & paths ----
   plane(0,0,-30,700,700,M.ground);
   plane(0,0.015,125,9,140,M.asphalt);
-  const pav=plane(0,0.02,38,72,50,M.paving);
+  const pav=plane(0,0.025,38,72,50,cobbleMat(72,50));
   const mp=(x1,z1,x2,z2,w)=>{ const cx=(x1+x2)/2, cz=(z1+z2)/2, len=Math.hypot(x2-x1,z2-z1); const p=plane(cx,0.02,cz,len,w,M.asphalt); p.rotation.z=Math.atan2(z2-z1,x2-x1)+Math.PI/2; p.rotation.z=(Math.abs(x2-x1)>Math.abs(z2-z1))?0:Math.PI/2; return p; };
-  plane(0,0.02,-30,14,114,M.asphalt).rotation.z=0;
+  plane(0,0.025,-30,14,114,cobbleMat(14,114)).rotation.z=0;
   // spurs (planes: width along x by default, so use w=len along x, d=width along z)
   plane(-24,0.02,-30,34,6,M.asphalt); plane(26,0.02,-45,60,6,M.asphalt); plane(-30,0.02,-60,50,6,M.asphalt);
   plane(-40,0.02,10,70,6,M.asphalt); plane(65,0.02,45,60,6,M.asphalt);
@@ -1768,7 +1800,7 @@ function loop(now){
   update(dt);
   if(!started){ camera.position.set(0,2.4,100); camera.rotation.set(0.05,0,0); updateLamps(dt); }
   gT+=dt; if(gT>0.07){gT=0;grain();}
-  renderer.render(scene,camera);
+  renderMain();
   if(shotWait>0){ shotWait--; if(shotWait===0) developShot(); }
 }
 requestAnimationFrame(loop);
@@ -1886,7 +1918,7 @@ setInterval(()=>{
 
 // ---------- voices: pre-recorded natural voices; Dale comes through a walkie-talkie ----------
 let talkN=0;
-function talkDip(src){ talkN++; music.talk=0.35; applyMusic(); src.onended=()=>{ talkN=Math.max(0,talkN-1); if(!talkN){ music.talk=1; applyMusic(); } }; }   // the song dips while someone talks
+function talkDip(src){ }   // (no pumping between lines: the song just sits lower once the call starts)   // the song dips while someone talks
 let daleTaken=false;   // after his last real call, 'Dale' is the thing using his voice
 let VOX={}; fetch('voice/lines.json').then(r=>r.ok?r.json():{}).then(j=>{VOX=j;}).catch(()=>{});
 const voxCache={}; let voxSrc=null;
@@ -2128,8 +2160,7 @@ setInterval(()=>{
     if(RESCUE) near=Math.min(near,4);
   }
   const want=clamp(1-(near-4)/22,0,1); FUZZ+=(want-FUZZ)*0.15; const a=FUZZ;
-  const cv=canvas; const base=camOn?'grayscale(1) sepia(.8) hue-rotate(55deg) saturate(1.7) brightness(1.45) contrast(1.12) ':'';
-  cv.style.filter=a>0.02?base+'blur('+(a*1.6).toFixed(2)+'px) contrast('+(1+a*0.25).toFixed(2)+') brightness('+(1-a*0.22).toFixed(2)+')':'';   // scrambles and darkens, never brightens
+  const cv=canvas; POST.fuzz=a; cv.style.filter='';   // scrambles and darkens inside the renderer, never brightens
   cv.style.transform=a>0.05?'translate('+((Math.random()-0.5)*a*7).toFixed(1)+'px,'+((Math.random()-0.5)*a*3).toFixed(1)+'px)':'';
   $('grain').style.opacity=(camOn?0.22:0.06)+a*0.06;
   $('glitch').style.opacity=a>0.3&&Math.random()<a*0.5?a*0.45:0;
@@ -2228,7 +2259,7 @@ function introGo(){
   at(4.4,()=>{ tc.style.opacity=0; });
   at(5.6,()=>{ if(I.phase==='drive'){ $('tc1').style.display=''; t2.textContent=''; tc.style.opacity=1; } });   // the title, held until the beat drops
   at(10.4,()=>{ tc.style.opacity=0; });
-  at(15.8,()=>{ if(I.phase==='drive'){ music.vol=0.26; applyMusic(); } });   // radio down a little, the call comes in
+  at(15.8,()=>{ if(I.phase==='drive'){ music.vol=0.42*0.4; music.ramp=3.5; applyMusic(); music.ramp=0.4; } });   // radio down a little, the call comes in
   // the call
   const L=(t,fn)=>at(t,()=>{ if(INTRO.phase==='drive') fn(); });
   L(15.8,()=>dale('Liam, it\'s Dale. I handle things for the sellers. You on your way?',7.5));
