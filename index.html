@@ -14,7 +14,8 @@
   @keyframes roll{0%{top:-15%}100%{top:105%}}
   #scan{position:fixed;inset:0;pointer-events:none;background:repeating-linear-gradient(0deg,rgba(0,0,0,.2) 0,rgba(0,0,0,.2) 1px,transparent 1px,transparent 3px)}
   #vig{position:fixed;inset:0;pointer-events:none;background:radial-gradient(ellipse at center,transparent 42%,rgba(0,0,0,.88) 100%)}
-  #grain{position:fixed;inset:0;width:100%;height:100%;pointer-events:none;opacity:.06;mix-blend-mode:screen;image-rendering:pixelated}
+  #grain{display:none!important}   /* drawn by the shader */
+  #glitch,#camlines{display:none!important}
   #glitch{position:fixed;left:0;right:0;top:40%;height:6%;pointer-events:none;background:linear-gradient(rgba(255,255,255,.0),rgba(255,255,255,.35),rgba(255,255,255,0));opacity:0;animation:gl 3.2s linear infinite;mix-blend-mode:screen}
   @keyframes gl{0%{top:-8%}100%{top:104%}}
   #flashfx{position:fixed;inset:0;background:#fff;opacity:0;pointer-events:none;transition:opacity .25s}
@@ -82,7 +83,7 @@
 <div id="refs" style="position:fixed;inset:0;display:none;align-items:center;justify-content:center;background:rgba(0,0,0,.85);z-index:10;color:#ffd35a;font-size:28px;cursor:pointer">[ press A to go back to full screen ]</div>
 <div id="sigloss"><div class="snow"></div><p>SIGNAL LOST</p></div>
 <div id="death"><h1 style="color:#c22;letter-spacing:.3em">YOU DIED</h1><p id="dmsg"></p><p class="opt" id="dcont">&#9654; Continue from checkpoint <span class="k2" id="dkey">[R]</span></p><p style="color:#8a8070;font-size:13px">Pause menu: <span id="dmkey">Esc</span></p></div>
-<div id="menu"><div class="box"><h2>PAUSED</h2><p class="hint" style="margin:-10px 0 10px">build 10-23i</p><div id="mitems"></div><div id="mhelp"></div><p class="hint" id="mdiag" style="color:#9aa"></p><p class="hint" id="mhint"></p></div></div>
+<div id="menu"><div class="box"><h2>PAUSED</h2><p class="hint" style="margin:-10px 0 10px">build 10-23j</p><div id="mitems"></div><div id="mhelp"></div><p class="hint" id="mdiag" style="color:#9aa"></p><p class="hint" id="mhint"></p></div></div>
 <div id="end"><h1>&mdash;</h1><p id="emsg"></p></div>
 
 <script>/**
@@ -115,12 +116,16 @@ const BASE_FOV=72; let zoom=1;
 const POST={rt:null,scene:null,cam:null,mat:null,fuzz:0,rows:270};
 function setupPost(){
   POST.rt=new THREE.WebGLRenderTarget(4,4,{minFilter:THREE.NearestFilter,magFilter:THREE.NearestFilter});
-  POST.mat=new THREE.ShaderMaterial({uniforms:{t:{value:POST.rt.texture},cam:{value:0},fuzz:{value:0},rows:{value:270},res:{value:new THREE.Vector2(4,4)}},
+  POST.mat=new THREE.ShaderMaterial({uniforms:{t:{value:POST.rt.texture},cam:{value:0},fuzz:{value:0},rows:{value:270},res:{value:new THREE.Vector2(4,4)},time:{value:0},grain:{value:0.06},glitch:{value:0}},
     vertexShader:'varying vec2 vUv; void main(){ vUv=uv; gl_Position=vec4(position.xy,0.,1.); }',
-    fragmentShader:'uniform sampler2D t; uniform float cam; uniform float fuzz; uniform float rows; uniform vec2 res; varying vec2 vUv;\n'+
+    fragmentShader:'uniform sampler2D t; uniform float cam; uniform float fuzz; uniform float rows; uniform vec2 res; uniform float time; uniform float grain; uniform float glitch; varying vec2 vUv;\n'+
+      'float hash(vec2 p){ return fract(sin(dot(p,vec2(12.9898,78.233)))*43758.5453); }\n'+
       'void main(){ vec2 px=vec2(floor(rows*res.x/res.y+0.5),rows); vec2 uv=rows<res.y-1.0?(floor(vUv*px)+0.5)/px:vUv; vec3 c=texture2D(t,uv).rgb;\n'+
       ' if(fuzz>0.01){ vec2 o=vec2(fuzz*2.5/px.x,0.); vec2 q=vec2(0.,fuzz*1.5/px.y); c=(c+texture2D(t,uv+o).rgb+texture2D(t,uv-o).rgb+texture2D(t,uv+q).rgb)*0.25; c=(c-0.5)*(1.+fuzz*0.25)+0.5; c*=1.-fuzz*0.22; }\n'+
       ' if(cam>0.5){ float l=dot(c,vec3(0.299,0.587,0.114)); c=vec3(l*0.80,l*1.04,l*0.76)*1.45; c=(c-0.5)*1.12+0.5; }\n'+
+      ' float n=hash(floor(vUv*res)+vec2(floor(time*14.)*7.13,floor(time*14.)*3.71)); c=1.-(1.-c)*(1.-n*grain);\n'+                         // static (screen-blended noise)
+      ' float gy=1.-fract(time/3.2)*1.12+0.06; c+=vec3(0.35*glitch*exp(-pow((vUv.y-gy)/0.025,2.)));\n'+                          // rolling glitch bar
+      ' if(cam>0.5){ float row=mod(floor(vUv.y*res.y+time*3.6),3.); if(row<1.) c*=0.68; float ry=1.-fract(time/5.)*1.2+0.1; c+=vec3(0.07,0.10,0.075)*exp(-pow((vUv.y-ry)/0.06,2.)); }\n'+   // camera lines + rolling band
       ' gl_FragColor=vec4(clamp(c,0.,1.),1.); }',depthTest:false,depthWrite:false});
   POST.scene=new THREE.Scene(); POST.cam=new THREE.Camera(); POST.scene.add(new THREE.Mesh(new THREE.PlaneGeometry(2,2),POST.mat));
 }
@@ -128,10 +133,11 @@ function renderMain(){
   if(!POST.rt) setupPost();
   if(window.followLights) followLights();
   const sz=renderer.getSize(new THREE.Vector2()); if(POST.rt.width!==sz.x||POST.rt.height!==sz.y){ POST.rt.setSize(sz.x,sz.y); POST.mat.uniforms.res.value.set(sz.x,sz.y); }
-  POST.mat.uniforms.cam.value=camOn?1:0; POST.mat.uniforms.fuzz.value=POST.fuzz; POST.mat.uniforms.rows.value=Math.min(POST.rows,sz.y);
+  POST.mat.uniforms.cam.value=camOn?1:0; POST.mat.uniforms.fuzz.value=POST.fuzz; POST.mat.uniforms.time.value=performance.now()/1000;
+  POST.mat.uniforms.grain.value=(camOn?0.13:0.045)+POST.fuzz*0.05; { const g=document.getElementById('glitch'); POST.mat.uniforms.glitch.value=g?(parseFloat(g.style.opacity)||0):0; } POST.mat.uniforms.rows.value=Math.min(POST.rows,sz.y);
   renderer.setRenderTarget(POST.rt); renderer.render(scene,camera); renderer.setRenderTarget(null); renderer.render(POST.scene,POST.cam);
 }
-let resH=360;   // fixed: the drawing surface is never resized mid-game (that was blanking the screen)
+let resH=270;   // the game's native chunky look: 97k pixels a frame   // fixed: the drawing surface is never resized mid-game (that was blanking the screen)
 // ---------- error reporting: show it small in the corner, keep it for next time, never freeze ----------
 let errShown=0;
 function reportErr(e,where){
@@ -1809,7 +1815,7 @@ function loop(now){
   const dt=Math.min(0.05,(now-last)/1000); last=now;
   try{ update(dt); }catch(e){ reportErr(e,'update'); }
   try{ if(!started){ camera.position.set(0,2.4,100); camera.rotation.set(0.05,0,0); updateLamps(dt); }
-  gT+=dt; if(gT>0.07){gT=0;grain();}
+  // (static is drawn in the shader now)
   renderMain();
   if(shotWait>0){ shotWait--; if(shotWait===0) developShot(); } }catch(e){ reportErr(e,'render'); }
 }
@@ -2076,7 +2082,7 @@ function drawMenu(){
     :'WASD: move &nbsp; Mouse: look<br>E: interact (hold)<br>Q: night-vision camera &nbsp; Click: photo &nbsp; Scroll: zoom<br>Shift: sprint (loud) &nbsp; C: crouch (quiet)';
 }
 function diagLine(){ const c=camera.position, f=n=>Number.isFinite(n)?(+n.toFixed(2)):String(n); const sz=renderer.getSize(new THREE.Vector2()); let gl='?'; try{ gl=renderer.getContext().isContextLost()?'LOST':'ok'; }catch(x){}
-  return 'build 10-23i   diag  pos '+f(c.x)+','+f(c.y)+','+f(c.z)+'  yaw '+f(player.yaw)+' pitch '+f(player.pitch)+'  fov '+f(camera.fov)+' zoom '+f(zoom)+'  fog '+f(scene.fog.density)+'  size '+sz.x+'x'+sz.y+' rows '+POST.rows+'  gl '+gl+' lost '+GL_LOST+'/'+GL_RESTORED+'  cam '+camOn+'  fuzz '+f(POST.fuzz)+'  intro '+INTRO.phase+'  stage '+stage; }
+  return 'build 10-23j   diag  pos '+f(c.x)+','+f(c.y)+','+f(c.z)+'  yaw '+f(player.yaw)+' pitch '+f(player.pitch)+'  fov '+f(camera.fov)+' zoom '+f(zoom)+'  fog '+f(scene.fog.density)+'  size '+sz.x+'x'+sz.y+' rows '+POST.rows+'  gl '+gl+' lost '+GL_LOST+'/'+GL_RESTORED+'  cam '+camOn+'  fuzz '+f(POST.fuzz)+'  intro '+INTRO.phase+'  stage '+stage; }
 function openMenu(){ if(paused||!started||dead||ended) return; paused=true; try{ $('mdiag').textContent=diagLine(); }catch(x){ $('mdiag').textContent='diag failed: '+x.message; } menuSel=0; $('mhelp').style.display='none'; drawMenu(); $('menu').style.display='flex'; try{document.exitPointerLock();}catch(e){} if(AC&&AC.state==='running') AC.suspend(); }
 function closeMenu(){ if(!paused) return; paused=false; $('menu').style.display='none'; if(AC&&AC.state==='suspended') AC.resume(); try{ const r=canvas.requestPointerLock(); if(r&&r.catch) r.catch(()=>{}); }catch(e){} }
 function menuMove(d){ menuSel=(menuSel+d+MENU.length)%MENU.length; blip(700,0.03,'square',0.03); drawMenu(); }
