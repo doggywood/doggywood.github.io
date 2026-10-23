@@ -7,7 +7,11 @@
 <style>
   html,body{margin:0;height:100%;background:#000;overflow:hidden;font-family:"Courier New",monospace;color:#d8ffe0;user-select:none}
   #c{position:fixed;inset:0;width:100%;height:100%;image-rendering:pixelated;transition:filter .15s}
-  #c.cam{filter:grayscale(1) sepia(1) hue-rotate(55deg) saturate(2.4) brightness(1.6) contrast(1.3)}
+  #c.cam{filter:grayscale(1) sepia(.8) hue-rotate(55deg) saturate(1.7) brightness(1.45) contrast(1.12)}
+  #camlines{position:fixed;inset:0;pointer-events:none;display:none;background:repeating-linear-gradient(0deg,rgba(0,0,0,.32) 0,rgba(0,0,0,.32) 2px,transparent 2px,transparent 5px);animation:cl 1.4s linear infinite}
+  #camlines::after{content:'';position:absolute;left:0;right:0;height:14%;background:linear-gradient(rgba(180,255,190,0),rgba(180,255,190,.10),rgba(180,255,190,0));animation:roll 5s linear infinite}
+  @keyframes cl{to{background-position:0 5px}}
+  @keyframes roll{0%{top:-15%}100%{top:105%}}
   #scan{position:fixed;inset:0;pointer-events:none;background:repeating-linear-gradient(0deg,rgba(0,0,0,.2) 0,rgba(0,0,0,.2) 1px,transparent 1px,transparent 3px)}
   #vig{position:fixed;inset:0;pointer-events:none;background:radial-gradient(ellipse at center,transparent 42%,rgba(0,0,0,.88) 100%)}
   #grain{position:fixed;inset:0;width:100%;height:100%;pointer-events:none;opacity:.06;mix-blend-mode:screen;image-rendering:pixelated}
@@ -39,6 +43,7 @@
 </head>
 <body>
 <canvas id="c"></canvas>
+<div id="camlines"></div>
 <canvas id="grain" width="80" height="45"></canvas>
 <div id="scan"></div><div id="vig"></div><div id="glitch"></div>
 <div id="hurt"></div><div id="flashfx"></div>
@@ -1441,7 +1446,7 @@ addEventListener('keydown',e=>{
 });
 addEventListener('keyup',e=>{keys[e.code]=false;});
 function applyCam(){
-  canvas.classList.toggle('cam',camOn); $('rec').style.display=camOn?'block':'none'; $('grain').style.opacity=camOn?0.22:0.06;
+  canvas.classList.toggle('cam',camOn); $('rec').style.display=camOn?'block':'none'; $('grain').style.opacity=camOn?0.03:0.06; $('camlines').style.display=camOn?'block':'none';
   WORLD.camThings.forEach(c=>c.visible=camOn||c.userData.near); amb.intensity=camOn?1.35:0.95;
   if(!camOn) zoomTarget=1;
 }
