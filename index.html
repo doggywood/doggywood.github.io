@@ -82,7 +82,7 @@
 <div id="refs" style="position:fixed;inset:0;display:none;align-items:center;justify-content:center;background:rgba(0,0,0,.85);z-index:10;color:#ffd35a;font-size:28px;cursor:pointer">[ press A to go back to full screen ]</div>
 <div id="sigloss"><div class="snow"></div><p>SIGNAL LOST</p></div>
 <div id="death"><h1 style="color:#c22;letter-spacing:.3em">YOU DIED</h1><p id="dmsg"></p><p class="opt" id="dcont">&#9654; Continue from checkpoint <span class="k2" id="dkey">[R]</span></p><p style="color:#8a8070;font-size:13px">Pause menu: <span id="dmkey">Esc</span></p></div>
-<div id="menu"><div class="box"><h2>PAUSED</h2><div id="mitems"></div><div id="mhelp"></div><p class="hint" id="mdiag" style="color:#9aa"></p><p class="hint" id="mhint"></p></div></div>
+<div id="menu"><div class="box"><h2>PAUSED</h2><p class="hint" style="margin:-10px 0 10px">build 10-23g</p><div id="mitems"></div><div id="mhelp"></div><p class="hint" id="mdiag" style="color:#9aa"></p><p class="hint" id="mhint"></p></div></div>
 <div id="end"><h1>&mdash;</h1><p id="emsg"></p></div>
 
 <script>/**
@@ -1356,6 +1356,7 @@ function updateTaker(dt){
 </script>
 <script>"use strict";
 // ================= DOGGYWOOD game =================
+var paused=false;
 let stage=0, tNow=0, started=false, locked=false, gameMin=22*60+10, camOn=false, flashOn=false, battery=100;   // no flashlight in this game
 let zoomTarget=1, photosTaken=0, sigilsBroken=0, powered=false, holdT=0, hbT=0, subTimer=null;
 const keys={}, events=[]; const later=(s,fn)=>events.push({t:tNow+s,fn});
@@ -2052,7 +2053,7 @@ setInterval(()=>{ if(sigilRemark||!started||dead||ended||stage!==3) return;
     if(d<18&&seenPoint(_t.set(sg.x,(sg.y||0)+0.5,sg.z))){ sigilRemark=true; liam('Ugh. Great. These kids are tanking the sell value.',4); return; } } },300);
 
 // ---------- pause menu ----------
-let paused=false, menuSel=0, LOOK=1, VOL=0.9;
+let menuSel=0, LOOK=1, VOL=0.9;   // (paused is declared early, before the game loop can start)
 try{ const sv=JSON.parse(localStorage.getItem('dw_opts')||'{}'); if(sv.look) LOOK=sv.look; if(sv.vol!=null) VOL=sv.vol; }catch(e){}
 const saveOpts=()=>{ try{ localStorage.setItem('dw_opts',JSON.stringify({look:LOOK,vol:VOL})); }catch(e){} };
 const applyVol=()=>{ if(master) master.gain.value=VOL; };
@@ -2074,7 +2075,7 @@ function drawMenu(){
     :'WASD: move &nbsp; Mouse: look<br>E: interact (hold)<br>Q: night-vision camera &nbsp; Click: photo &nbsp; Scroll: zoom<br>Shift: sprint (loud) &nbsp; C: crouch (quiet)';
 }
 function diagLine(){ const c=camera.position, f=n=>Number.isFinite(n)?(+n.toFixed(2)):String(n); const sz=renderer.getSize(new THREE.Vector2()); let gl='?'; try{ gl=renderer.getContext().isContextLost()?'LOST':'ok'; }catch(x){}
-  return 'diag  pos '+f(c.x)+','+f(c.y)+','+f(c.z)+'  yaw '+f(player.yaw)+' pitch '+f(player.pitch)+'  fov '+f(camera.fov)+' zoom '+f(zoom)+'  fog '+f(scene.fog.density)+'  size '+sz.x+'x'+sz.y+' rows '+POST.rows+'  gl '+gl+' lost '+GL_LOST+'/'+GL_RESTORED+'  cam '+camOn+'  fuzz '+f(POST.fuzz)+'  intro '+INTRO.phase+'  stage '+stage; }
+  return 'build 10-23g   diag  pos '+f(c.x)+','+f(c.y)+','+f(c.z)+'  yaw '+f(player.yaw)+' pitch '+f(player.pitch)+'  fov '+f(camera.fov)+' zoom '+f(zoom)+'  fog '+f(scene.fog.density)+'  size '+sz.x+'x'+sz.y+' rows '+POST.rows+'  gl '+gl+' lost '+GL_LOST+'/'+GL_RESTORED+'  cam '+camOn+'  fuzz '+f(POST.fuzz)+'  intro '+INTRO.phase+'  stage '+stage; }
 function openMenu(){ if(paused||!started||dead||ended) return; paused=true; try{ $('mdiag').textContent=diagLine(); }catch(x){ $('mdiag').textContent='diag failed: '+x.message; } menuSel=0; $('mhelp').style.display='none'; drawMenu(); $('menu').style.display='flex'; try{document.exitPointerLock();}catch(e){} if(AC&&AC.state==='running') AC.suspend(); }
 function closeMenu(){ if(!paused) return; paused=false; $('menu').style.display='none'; if(AC&&AC.state==='suspended') AC.resume(); try{ const r=canvas.requestPointerLock(); if(r&&r.catch) r.catch(()=>{}); }catch(e){} }
 function menuMove(d){ menuSel=(menuSel+d+MENU.length)%MENU.length; blip(700,0.03,'square',0.03); drawMenu(); }
