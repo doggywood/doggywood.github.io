@@ -1443,6 +1443,8 @@ addEventListener('wheel',e=>{ if(!started||!camOn) return; zoomTarget=clamp(zoom
 addEventListener('mousedown',e=>{ if(locked&&e.button===0) tryPhoto(); });
 $('start').addEventListener('click',()=>{
   initAudio(); if(AC&&AC.state==='suspended') AC.resume();
+  try{ const d=document.documentElement, f=d.requestFullscreen||d.webkitRequestFullscreen; if(f&&!document.fullscreenElement){ const r=f.call(d); if(r&&r.catch) r.catch(()=>{}); } }catch(e){}
+  try{ navigator.gamepadInputEmulation='gamepad'; }catch(e){}
   try{ const r=canvas.requestPointerLock(); if(r&&r.catch) r.catch(()=>{}); }catch(e){}
   $('start').style.display='none'; started=true; setOrder();
   if(WORLD.car) musicAt(WORLD.car.position.x,1,WORLD.car.position.z);
@@ -1483,7 +1485,7 @@ function setup(){
 let lastTrailT=0;
 
 // ---------- Xbox / gamepad controls ----------
-try{ navigator.gamepadInputEmulation='gamepad'; }catch(e){}   // Xbox Edge: give us the real controller, not a mouse cursor
+// Xbox Edge: the controller is a mouse cursor on the start screen (so A is a real click and full screen is allowed), then game controls once started
 const pad={fw:0,st:0,prev:[],on:false};
 const dz=v=>Math.abs(v)<0.18?0:Math.sign(v)*(Math.abs(v)-0.18)/0.82;
 const fakeKey=code=>dispatchEvent(new KeyboardEvent('keydown',{code}));
