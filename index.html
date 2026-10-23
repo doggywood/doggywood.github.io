@@ -62,6 +62,7 @@
   <p id="musicnote" style="color:#6a7"></p>
   <p style="margin-top:22px;color:#fff">[ click to begin ]</p>
 </div>
+<div id="refs" style="position:fixed;inset:0;display:none;align-items:center;justify-content:center;background:rgba(0,0,0,.85);z-index:10;color:#ffd35a;font-size:28px;cursor:pointer">[ press A to go back to full screen ]</div>
 <div id="death"><h1 style="color:#c22">DEAD</h1><p id="dmsg"></p><p style="color:#fff">[ press R to try again ]</p></div>
 <div id="end"><h1>&mdash;</h1><p id="emsg"></p></div>
 
@@ -1440,7 +1441,7 @@ function applyCam(){
   if(!camOn) zoomTarget=1;
 }
 addEventListener('wheel',e=>{ if(!started||!camOn) return; zoomTarget=clamp(zoomTarget*(e.deltaY<0?1.2:1/1.2),1,7); blip(500+zoomTarget*120,0.03,'square',0.04); },{passive:true});
-addEventListener('mousedown',e=>{ if(locked&&e.button===0) tryPhoto(); });
+addEventListener('mousedown',e=>{ if(locked&&e.button===0&&performance.now()/1000-pad.lastUse>1) tryPhoto(); });
 $('start').addEventListener('click',()=>{
   initAudio(); if(AC&&AC.state==='suspended') AC.resume();
   try{ const d=document.documentElement, f=d.requestFullscreen||d.webkitRequestFullscreen; if(f&&!document.fullscreenElement){ const r=f.call(d); if(r&&r.catch) r.catch(()=>{}); } }catch(e){}
@@ -1497,7 +1498,7 @@ function pollPad(dt){
   if(!gp){ return; }
   const b=i=>!!(gp.buttons[i]&&gp.buttons[i].pressed), hit=i=>b(i)&&!pad.prev[i];
   if(!pad.on){ pad.on=true; const n=$('padnote'); if(n) n.style.display='block'; }
-  if(!started){ if(hit(0)||hit(9)) $('start').click(); }
+  if(!started){ if((hit(0)||hit(9))&&!pad.startT) pad.startT=setTimeout(()=>{ if(!started) $('start').click(); },400); }
   else if(dead){ if(hit(0)||hit(9)) fakeKey('KeyR'); }
   else if(!ended){
     pad.fw=-dz(gp.axes[1]||0); pad.st=dz(gp.axes[0]||0);
@@ -1664,6 +1665,11 @@ requestAnimationFrame(loop);
 
 music.vol = 0.55/3;   // radio sits quietly under the game
 $('musicnote').textContent = 'Car radio: Kavinsky - Nightcall';
+
+// Xbox: Edge only leaves the controller buttons to the game in full screen, so keep it there
+function goFull(){ try{ const d=document.documentElement, f=d.requestFullscreen||d.webkitRequestFullscreen; if(f&&!document.fullscreenElement){ const r=f.call(d); if(r&&r.catch) r.catch(()=>{}); } }catch(e){} }
+document.addEventListener('fullscreenchange',()=>{ $('refs').style.display = (started&&pad.on&&!document.fullscreenElement&&!dead&&!ended) ? 'flex' : 'none'; });
+$('refs').addEventListener('click',()=>{ goFull(); $('refs').style.display='none'; try{ const r=canvas.requestPointerLock(); if(r&&r.catch) r.catch(()=>{}); }catch(e){} });
 </script>
 </body>
 </html>
