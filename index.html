@@ -2303,6 +2303,39 @@ function monsterInFrame(){
   if(carWatcher.visible&&test(carWatcher.position)) return true;
   return false;
 }
+
+// ---------- the ghost train: once the power is back, the coaster runs on its own ----------
+const GHOST={cars:[],u:0,v:0.012,on:false,clackT:0,flick:0,lapScream:false};
+(()=>{ const pale=new THREE.MeshBasicMaterial({color:0xbfd6e0,transparent:true,opacity:0.32,depthWrite:false,blending:THREE.AdditiveBlending,fog:true});
+  const faint=new THREE.MeshBasicMaterial({color:0xe6f0f2,transparent:true,opacity:0.22,depthWrite:false,blending:THREE.AdditiveBlending,fog:true});
+  for(let k=0;k<3;k++){ const g=new THREE.Group();
+    mesh(BG(1.7,0.55,2.0),pale,0,0.45,0,g); mesh(BG(1.7,0.7,0.12),pale,0,0.85,-0.95,g); mesh(BG(1.6,0.12,0.5),pale,0,1.0,0.9,g,0.4,0,0);   // car body, seat back, front lip
+    if(k===0){ const nose=mesh(BG(1.7,0.5,0.6),pale,0,0.5,1.25,g,0.35,0,0); }
+    [-0.42,0.42].forEach((x,r)=>{ if((k+r)%3===2) return;                 // faint riders, not every seat
+      mesh(SG(0.17,6,5),faint,x,1.45,-0.3,g); mesh(BG(0.32,0.5,0.22),faint,x,1.05,-0.3,g);
+      if((k*2+r)%3===0){ mesh(BG(0.07,0.6,0.07),faint,x-0.15,1.75,-0.25,g,0,0,0.2); mesh(BG(0.07,0.6,0.07),faint,x+0.15,1.75,-0.25,g,0,0,-0.2); } });   // arms up
+    const glow=new THREE.Sprite(new THREE.SpriteMaterial({map:glowTex,color:0x9fc8d8,transparent:true,depthWrite:false,blending:THREE.AdditiveBlending,opacity:0.35}));
+    glow.scale.setScalar(4); glow.position.y=1; g.add(glow);
+    g.visible=false; scene.add(g); GHOST.cars.push(g); } })();
+const _gp=new THREE.Vector3(), _gt=new THREE.Vector3();
+setInterval(()=>{
+  if(!WORLD.coasterCurve||paused) return;
+  if(!GHOST.on){ if(powered&&!ended){ GHOST.on=true; GHOST.u=0.02; } else return; }
+  const dt=0.05, C=WORLD.coasterCurve;
+  // slow on the climbs, fast on the drops
+  const slope=C.getTangentAt(GHOST.u%1).y; GHOST.v+=((0.0075-slope*0.012)-GHOST.v)*dt*1.5; GHOST.v=Math.max(0.0028,GHOST.v);
+  GHOST.u+=GHOST.v*dt*10; if(GHOST.u>=1){ GHOST.u-=1; GHOST.lapScream=false; }
+  GHOST.flick-=dt; const blink=GHOST.flick>0;                 // now and then it just isn't there
+  if(GHOST.flick<-2&&Math.random()<0.02) GHOST.flick=0.25+Math.random()*0.6;
+  GHOST.cars.forEach((g,k)=>{ const u=((GHOST.u-k*0.012)%1+1)%1; C.getPointAt(u,_gp); C.getTangentAt(u,_gt);
+    g.position.set(_gp.x,_gp.y+0.2,_gp.z); g.lookAt(_gp.x+_gt.x,_gp.y+0.2+_gt.y,_gp.z+_gt.z);
+    g.visible=!ended&&!blink;
+    const op=0.22+Math.random()*0.16; g.children.forEach(c=>{ if(c.material&&!c.isSprite) c.material.opacity=c.material.color.r>0.85?op*0.7:op; }); });
+  // the track clacks wherever it is; sometimes a scream on the big drop
+  const lead=GHOST.cars[0].position;
+  GHOST.clackT-=dt; if(GHOST.clackT<=0){ GHOST.clackT=Math.max(0.12,0.5-GHOST.v*30); noiseBurst(0.05,700+Math.random()*300,0.18,2,{x:lead.x,y:lead.y,z:lead.z}); }
+  if(slope<-0.35&&!GHOST.lapScream){ GHOST.lapScream=true; if(Math.random()<0.4) scream(V(lead.x,lead.y,lead.z)); }
+},50);
 </script>
 </body>
 </html>
