@@ -1907,6 +1907,12 @@ function tryBehind(d,target){
   d.head.rotation.set(0.12,0,0.28);
   d.behind=true; behindCD=45; return true;
 }
+
+// first look at a painted panel: Liam thinks it's the urbex kids' graffiti
+let sigilRemark=false;
+setInterval(()=>{ if(sigilRemark||!started||dead||ended||stage!==3) return;
+  for(const sg of WORLD.sigils){ if(sg.broken) continue; const d=Math.hypot(sg.x-player.pos.x,sg.z-player.pos.z);
+    if(d<18&&seenPoint(_t.set(sg.x,(sg.y||0)+0.5,sg.z))){ sigilRemark=true; liam('Ugh. Great. These kids are tanking the sell value.',4); return; } } },300);
 </script>
 </body>
 </html>
