@@ -1374,7 +1374,7 @@ function kidsEvent(){
   later(11,()=>{ kidA.visible=kidB.visible=false; kidRun=null; scene.remove(kidA); scene.remove(kidB);
     dale('Urbex kids. They climb the fence every weekend to film their videos. Ignore them.',5); });
   later(16,()=>{ scream(V(-110,1.5,-90)); });
-  later(19,()=>{ dale('...Did you hear that?',3); stage=1; });
+  later(19,()=>{ dale('...Did you hear that?',3); });   // (used to reset the stage, which could lock you out of the breaker)
 }
 function activateDogs(n){
   return;   // only one dog now
