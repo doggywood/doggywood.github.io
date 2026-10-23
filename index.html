@@ -39,7 +39,7 @@
 </head>
 <body>
 <canvas id="c"></canvas>
-<canvas id="grain" width="160" height="90"></canvas>
+<canvas id="grain" width="80" height="45"></canvas>
 <div id="scan"></div><div id="vig"></div><div id="glitch"></div>
 <div id="hurt"></div><div id="flashfx"></div>
 <div id="hud">
@@ -1266,7 +1266,7 @@ const seenDogSet=new Set();
 let horsesSpawned=false, lifeguardSpawned=false, mirrorSpawned=false, kidsSpawned=false, choir2Spawned=false, sextonSpawned=false, campCue=false;
 const photoTargets=[
   {id:'fountain',label:'Cracked fountain (plaza)',pos:V(0,1.6,40),done:false},
-  {id:'carousel',label:'Carousel mounting (zoom in)',pos:V(-40,3,-30),done:false},
+  {id:'carousel',label:'Carousel mounting',pos:V(-40,3,-30),r:5,done:false},
   {id:'coaster',label:'Coaster support, east side (zoom in)',pos:V(115,10,-65),done:false,far:true},
 ];
 const tickets=[{x:-20.6,z:40,got:false},{x:25,z:7,got:false},{x:-11,z:-4,got:false}];
@@ -1406,16 +1406,21 @@ function endGame(){
 function tryPhoto(){
   if(!camOn||stage!==1||dead||ended) return;
   shutter(); const f=$('flashfx'); f.style.opacity=1; setTimeout(()=>{f.style.opacity=0;},120);
+  let blocked=false, tooFar=false;
   for(const t of photoTargets){
     if(t.done) continue;
-    _v.copy(t.pos).project(camera);
-    if(_v.z>1||Math.abs(_v.x)>0.5||Math.abs(_v.y)>0.5) continue;
-    const dist=camera.position.distanceTo(t.pos); if(dist>130) continue;
-    if(t.far&&zoom<1.6) { say('Too far. Zoom in (scroll).',2.5); return; }
-    if(!losClear(camera.position,t.pos)) continue;
-    photoTaken(t); return;
+    // big things (the carousel) count if any part of them is in the shot, not just the exact centre
+    const pts=[t.pos]; if(t.r) for(let i=0;i<8;i++){ const a=i/8*TAU; pts.push(V(t.pos.x+Math.cos(a)*t.r,2.2,t.pos.z+Math.sin(a)*t.r)); }
+    for(const pt of pts){
+      _v.copy(pt).project(camera);
+      if(_v.z>1||Math.abs(_v.x)>0.6||Math.abs(_v.y)>0.6) continue;
+      if(camera.position.distanceTo(pt)>130) continue;
+      if(t.far&&zoom<1.6){ tooFar=true; break; }
+      if(!losClear(camera.position,pt)){ blocked=true; continue; }
+      photoTaken(t); return;
+    }
   }
-  say('Nothing worth documenting in frame.',2);
+  say(tooFar?'Too far. Zoom in (scroll / D-pad).':blocked?'Something\'s in the way. Get a clearer angle.':'Nothing worth documenting in frame.',2.5);
 }
 function developShot(){
   const pc=$('pcanvas'), g=pc.getContext('2d'); g.drawImage(canvas,0,0,pc.width,pc.height);
@@ -1642,7 +1647,7 @@ function revealBodies(){
 }
 
 // ---------- film grain ----------
-const gcv=$('grain'), gctx=gcv.getContext('2d'); const gimg=gctx.createImageData(160,90);
+const gcv=$('grain'), gctx=gcv.getContext('2d'); const gimg=gctx.createImageData(80,45);
 function grain(){ const d=gimg.data; for(let i=0;i<d.length;i+=4){ const v=Math.random()*255; d[i]=d[i+1]=d[i+2]=v; d[i+3]=255; } gctx.putImageData(gimg,0,0); }
 
 // ---------- boot ----------
