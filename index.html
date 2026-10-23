@@ -58,7 +58,7 @@
 <div id="camlines"></div>
 <canvas id="grain" width="640" height="360"></canvas>
 <div id="scan"></div><div id="vig"></div><div id="glitch"></div>
-<div id="hurt"></div><div id="flashfx"></div><div id="fade" style="position:fixed;inset:0;background:#000;opacity:0;pointer-events:none;transition:opacity .9s;z-index:8"></div><div id="titlecard" style="position:fixed;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;pointer-events:none;z-index:9;opacity:0;transition:opacity 1.2s"><div id="tc1" style="font-size:min(13vw,130px);letter-spacing:.35em;padding-left:.35em;color:#e8e0c8;text-shadow:0 0 18px rgba(0,0,0,.9),3px 0 0 rgba(255,0,60,.35),-3px 0 0 rgba(0,200,255,.35)">DOGGYWOOD</div><div id="tc2" style="margin-top:18px;font-size:min(4.4vw,34px);letter-spacing:.35em;color:#cfc6ae;text-shadow:0 0 10px #000"></div></div><div id="skiphint" style="position:fixed;right:20px;bottom:16px;color:#9a9;font-size:13px;display:none;z-index:7"></div>
+<div id="hurt"></div><div id="flashfx"></div><div id="fade" style="position:fixed;inset:0;background:#000;opacity:0;pointer-events:none;transition:opacity .9s;z-index:8"></div><div id="titlecard" style="position:fixed;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;pointer-events:none;z-index:9;opacity:0;transition:opacity 1.2s"><div id="tc1" style="font-size:min(13vw,130px);letter-spacing:.35em;padding-left:.35em;color:#e8e0c8;text-shadow:0 0 18px rgba(0,0,0,.9),3px 0 0 rgba(255,0,60,.35),-3px 0 0 rgba(0,200,255,.35)">DOGGYWOOD</div><div id="tc2" style="margin-top:18px;font-size:min(4.4vw,34px);letter-spacing:.35em;color:#cfc6ae;text-shadow:0 0 10px #000"></div></div><div id="errline" style="position:fixed;left:8px;bottom:6px;z-index:30;font-size:11px;color:#ff7070;text-shadow:0 0 3px #000;pointer-events:none;display:none"></div><div id="skiphint" style="position:fixed;right:20px;bottom:16px;color:#9a9;font-size:13px;display:none;z-index:7"></div>
 <div id="hud">
   <div id="order"></div>
   <div id="rec"><span class="dot">&#9679;</span> REC &nbsp;DOGGYWOOD INSPECTION CAM 02<br><span id="bat"></span></div>
@@ -131,6 +131,15 @@ function renderMain(){
   renderer.setRenderTarget(POST.rt); renderer.render(scene,camera); renderer.setRenderTarget(null); renderer.render(POST.scene,POST.cam);
 }
 let resH=540;   // fixed: the drawing surface is never resized mid-game (that was blanking the screen)
+// ---------- error reporting: show it small in the corner, keep it for next time, never freeze ----------
+let errShown=0;
+function reportErr(e,where){
+  const msg=(where?where+': ':'')+(e&&e.message?e.message:String(e))+(e&&e.stack?' @'+String(e.stack).split('\n')[1]?.trim().slice(0,90):'');
+  try{ localStorage.setItem('dw_lasterr',new Date().toLocaleTimeString()+' '+msg); }catch(x){}
+  const el=document.getElementById('errline'); if(el&&errShown<30){ errShown++; el.textContent='ERROR '+msg; el.style.display='block'; clearTimeout(el._t); el._t=setTimeout(()=>{ el.style.display='none'; },15000); }
+}
+addEventListener('error',e=>reportErr(e.error||e.message,'page'));
+addEventListener('unhandledrejection',e=>{ const r=String(e.reason||''); if(/pointer ?lock|PointerLock|UnknownError/i.test(r)){ e.preventDefault(); return; } reportErr(e.reason,'promise'); });
 function resize(){
   const h=resH, w=Math.round(h*innerWidth/innerHeight);
   renderer.setSize(w,h,false);
@@ -1563,7 +1572,7 @@ addEventListener('mousemove',e=>{
   const sens=0.0022*LOOK/Math.sqrt(zoom);
   player.yaw-=e.movementX*sens; player.pitch-=e.movementY*sens; player.pitch=clamp(player.pitch,-1.45,1.45);
 });
-canvas.addEventListener('click',()=>{ if(started&&!locked&&!dead&&!ended) canvas.requestPointerLock(); });
+canvas.addEventListener('click',()=>{ if(started&&!locked&&!dead&&!ended){ try{ const r=canvas.requestPointerLock(); if(r&&r.catch) r.catch(()=>{}); }catch(e){} } });
 
 // ---------- your car: an old company sedan ----------
 function buildCarBody(car){
@@ -1795,11 +1804,11 @@ let last=performance.now(), gT=0, shotWait=0;
 function loop(now){
   requestAnimationFrame(loop);
   const dt=Math.min(0.05,(now-last)/1000); last=now;
-  update(dt);
-  if(!started){ camera.position.set(0,2.4,100); camera.rotation.set(0.05,0,0); updateLamps(dt); }
+  try{ update(dt); }catch(e){ reportErr(e,'update'); }
+  try{ if(!started){ camera.position.set(0,2.4,100); camera.rotation.set(0.05,0,0); updateLamps(dt); }
   gT+=dt; if(gT>0.07){gT=0;grain();}
   renderMain();
-  if(shotWait>0){ shotWait--; if(shotWait===0) developShot(); }
+  if(shotWait>0){ shotWait--; if(shotWait===0) developShot(); } }catch(e){ reportErr(e,'render'); }
 }
 requestAnimationFrame(loop);
 
@@ -2056,7 +2065,9 @@ const MENU=[
 ];
 function drawMenu(){
   $('mitems').innerHTML=MENU.map((m,i)=>'<div class="it'+(i===menuSel?' sel':'')+'" data-i="'+i+'">'+m.t()+'</div>').join('');
-  $('mhint').textContent=pad.on?'D-pad: move / change   A: select   B or RB: resume':'Mouse or arrow keys: move / change   Enter: select   Esc: resume';
+  let le=''; try{ le=localStorage.getItem('dw_lasterr')||''; }catch(x){}
+  $('mhelp').dataset.err=le;
+  $('mhint').textContent=(le?'Last error: '+le.slice(0,140)+'   ':'')+(pad.on?'D-pad: move / change   A: select   B or RB: resume':'Mouse or arrow keys: move / change   Enter: select   Esc: resume');
   $('mhelp').innerHTML=pad.on
     ?'Left stick: move &nbsp; Right stick: look<br>A: interact (hold)<br>Y: night-vision camera &nbsp; RT: photo &nbsp; D-pad: zoom<br>LB: sprint (loud) &nbsp; B: crouch (quiet) &nbsp; RB: pause'
     :'WASD: move &nbsp; Mouse: look<br>E: interact (hold)<br>Q: night-vision camera &nbsp; Click: photo &nbsp; Scroll: zoom<br>Shift: sprint (loud) &nbsp; C: crouch (quiet)';
