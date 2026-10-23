@@ -15,7 +15,7 @@ for who,lines in (('dale',dale),('liam',liam)):
     if t=='t' or not t.strip(): continue
     fn=who+'_'+hashlib.md5(t.encode()).hexdigest()[:8]+'.mp3'; man[who+'|'+t]=fn
     path=os.path.join(out,fn)
-    if os.path.exists(path): continue
+    if os.path.exists(path) and os.path.getsize(path)>2000: continue
     v,rate,pitch=VO[who]
     spoken=t.replace('--','...')
     import time
