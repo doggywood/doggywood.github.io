@@ -22,7 +22,7 @@
   #hud{position:fixed;inset:0;pointer-events:none;text-shadow:0 0 4px #000,1px 1px 0 #000}
   #order{position:absolute;left:18px;top:16px;font-size:14px;line-height:1.5;max-width:44vw;opacity:.92}
   #order b{color:#ffd35a}
-  #hp{position:absolute;left:18px;bottom:16px;font-size:22px;color:#e22;letter-spacing:4px}
+  #hp{display:none;position:absolute;left:18px;bottom:16px;font-size:22px;color:#e22;letter-spacing:4px}
   #rec{position:absolute;right:20px;top:16px;font-size:15px;text-align:right;display:none}
   #rec .dot{color:#f22;animation:bl 1s steps(2) infinite}
   @keyframes bl{50%{opacity:0}}
@@ -68,7 +68,7 @@
   <p style="margin-top:22px;color:#fff">[ click to begin ]</p>
 </div>
 <div id="refs" style="position:fixed;inset:0;display:none;align-items:center;justify-content:center;background:rgba(0,0,0,.85);z-index:10;color:#ffd35a;font-size:28px;cursor:pointer">[ press A to go back to full screen ]</div>
-<div id="death"><h1 style="color:#c22">DEAD</h1><p id="dmsg"></p><p style="color:#fff">[ press R to try again ]</p></div>
+<div id="death"><h1 style="color:#c22">DEAD</h1><p id="dmsg"></p><p style="color:#fff">[ press R / A to continue from the last checkpoint ]</p></div>
 <div id="end"><h1>&mdash;</h1><p id="emsg"></p></div>
 
 <script>/**
@@ -1078,6 +1078,7 @@ function spawnDog(fake){
 }
 function placeDog(d,x,y,z,o){
   o=o||{};
+  if(!o.keepOthers) dogs.forEach(o2=>{ if(o2!==d) o2.g.visible=false; });   // you only ever see one of him
   d.g.position.set(x,y,z);
   const tgt=o.point||(o.away?V(2*x-camera.position.x,0,2*z-camera.position.z):camera.position);
   d.g.rotation.y=Math.atan2(tgt.x-x,tgt.z-z);
@@ -1142,6 +1143,7 @@ class StatueMon{
   }
   spawn(x,z,y,rise){ this.g.position.set(x,y||0,z); this.g.visible=true; this.active=true; this.t=0; this.rise=rise||0; if(rise) this.g.position.y=(y||0)-rise; this.baseY=y||0; }
   despawn(){ this.active=false; this.g.visible=false; }
+  retreat(r){ r=r||16; const p=this.g.position, a=player.yaw+(Math.random()-0.5)*1.6; p.x=player.pos.x+Math.sin(a)*r; p.z=player.pos.z+Math.cos(a)*r; resolveCircle(p,0.5); this.t=0; }   // slinks off behind you
   update(dt){
     if(!this.active||ended||dead) return;
     this.t+=dt; const p=this.g.position;
@@ -1155,20 +1157,20 @@ class StatueMon{
     const nx=p.x+dx/dist*sp, nz=p.z+dz/dist*sp;
     if(!(this.lightAverse&&litAt(nx,nz,0.3))){ p.x=nx; p.z=nz; if(this.t>this.noclipT) resolveCircle(p,0.5); }
     this.g.rotation.y=Math.atan2(dx,dz);
-    if(dist<this.kill){ if(this.hurtOnly) hurt(1,this.msg); else die(this.msg); }
+    if(dist<this.kill){ if(this.hurtOnly){ hurt(1,this.msg); this.retreat(); } else die(this.msg); }
   }
 }
 const mons={};
 function initStatueMons(){
-  mons.tyke=new StatueMon(makeTyke(),{speed:3.7,h:1.2,lightAverse:true,msg:'Something with too many knuckles was behind you.',name:'tyke',
+  mons.tyke=new StatueMon(makeTyke(),{speed:3.5,h:1.2,lightAverse:true,hurtOnly:true,msg:'Something with too many knuckles was behind you.',name:'tyke',
     tick:(m,dt,d,seen)=>{ if(!seen) m.g.userData.limbs.forEach((l,i)=>l.rotation.x=Math.sin(tNow*14+i*1.7)*0.5); }});
   mons.tyke.g.position.set(0,1.45,112); mons.tyke.g.rotation.y=Math.PI; mons.tyke.g.visible=true; // crouched on the car roof
-  mons.lifeguard=new StatueMon(makeLifeguard(),{speed:2.7,h:2.4,kill:1.5,noclipT:3,msg:'The lifeguard held you under.',name:'lifeguard',
+  mons.lifeguard=new StatueMon(makeLifeguard(),{speed:2.7,h:2.4,kill:1.5,noclipT:3,hurtOnly:true,msg:'The lifeguard held you under.',name:'lifeguard',
     tick:(m,dt)=>{ m.g.userData.drips.forEach(d=>{ d.position.y-=dt*1.6; if(d.position.y<0) d.position.y=rand(1.0,2.0); }); }});
   mons.mirror=new StatueMon(makeMirrorFolk(),{speed:2.9,h:3.4,kill:1.5,msg:'You looked away. It had stepped out of the glass.',name:'mirror'});
-  mons.kids=[0,1,2].map(i=>new StatueMon(makeHollowKid([0x2a3040,0x402a34,0x2a4034][i]),{speed:2.1,h:2,kill:1.3,msg:'Your friends are still filming.',name:'kid',
+  mons.kids=[0,1,2].map(i=>new StatueMon(makeHollowKid([0x2a3040,0x402a34,0x2a4034][i]),{speed:2.1,h:2,kill:1.3,hurtOnly:true,msg:'Your friends are still filming.',name:'kid',
     tick:(m,dt,d,seen)=>{ m.g.userData.glow.material.opacity=0.55+Math.random()*0.3; if(!seen&&d<22&&Math.random()<dt*0.12) speak(pick(['Hello? Is somebody there?','Please. It hurts.','Dale? Dale is that you?','Don\'t look at me.','Are you filming?','We\'re live. Say hi.']),0.4,0.5,0.75); }}));
-  mons.horses=[0,1,2].map(i=>new StatueMon(makeHorse(true),{speed:3.5,h:2.2,kill:1.6,msg:'The carousel horses finished their lap.',name:'horse',
+  mons.horses=[0,1,2].map(i=>new StatueMon(makeHorse(true),{speed:3.3,h:2.2,kill:1.6,hurtOnly:true,msg:'The carousel horses finished their lap.',name:'horse',
     tick:(m,dt,d,seen)=>{ if(!seen) m.g.children.forEach(c=>{ if(c.userData.leg) c.rotation.x=Math.sin(tNow*10)*0.5; }); }}));
   mons.usher=new StatueMon(makeUsher(),{speed:2.5,h:3.4,kill:1.7,msg:'The Usher found you a seat.',name:'usher',boost:2.2});
 }
@@ -1193,7 +1195,7 @@ function updateChoir(c,dt,idx){
     const w=wps[c.wp]; moveToward(c.g,{x:w[0],z:w[1]},1.5*dt);
     if(Math.hypot(w[0]-cp.x,w[1]-cp.z)<1.4) c.wp=(c.wp+1+(Math.random()<.3?1:0))%wps.length;
   } else {
-    const sp=c.state==='chase'?3.9:2.5; moveToward(c.g,c.target,sp*dt);
+    const sp=c.state==='chase'?3.5:2.3; moveToward(c.g,c.target,sp*dt);
     if(c.state==='chase'&&player.noise>0) c.target.copy(player.pos);
     if(Math.hypot(c.target.x-cp.x,c.target.z-cp.z)<1.0){ c.lost+=dt; if(c.lost>4){c.state='patrol';c.lost=0;} }
   }
@@ -1219,10 +1221,10 @@ function updateSexton(dt){
   if(!sexton.active||ended||dead) return;
   const g=sexton.g, p=g.position, dx=player.pos.x-p.x, dz=player.pos.z-p.z, d=Math.hypot(dx,dz);
   const eye=_t.set(p.x,2.4,p.z), pl=V(player.pos.x,player.crouch?1.0:1.6,player.pos.z);
-  const sees=d<24&&losClear(eye,pl);
+  const sees=d<20&&losClear(eye,pl);
   if(sees){ if(sexton.state!=='chase'){ sexton.state='chase'; stinger(0.8); } sexton.lost=0; }
   else if(sexton.state==='chase'){ sexton.lost+=dt; if(sexton.lost>5){ sexton.state='trail'; } }
-  if(sexton.state==='chase'){ moveToward(g,player.pos,4.4*dt); }
+  if(sexton.state==='chase'){ moveToward(g,player.pos,4.0*dt); }
   else {
     const tr=player.trail; const idx=Math.max(0,tr.length-1-Math.min(tr.length-1,22)); // follow where you were ~11s ago
     if(tr.length){ const target=tr[Math.min(sexton.ti,tr.length-1)]; const dd=moveToward(g,target,2.6*dt); if(dd<1.2&&sexton.ti<tr.length-1) sexton.ti++; if(sexton.ti<idx) sexton.ti=idx; }
@@ -1281,8 +1283,8 @@ let kidA,kidB,kidRun=null,kidLightA,kidLightB;
 
 function hurt(n,why){
   if(dead||ended||player.hurtT>0) return;
-  player.hp-=n; player.hurtT=1.2; stinger(0.8); thump(0.5);
-  const h=$('hurt'); h.style.opacity=1; setTimeout(()=>{h.style.opacity=0;},350);
+  player.hp-=n; player.hurtT=1.2; player.lastHit=tNow; stinger(0.8); thump(0.5);
+  const h=$('hurt'); h.style.opacity=1; player.flashT=0.35;
   if(player.hp<=0) die(why);
 }
 function die(why){
@@ -1320,10 +1322,10 @@ function nearInteract(){
 // ---------- story ----------
 function boothDone(){
   stage=1; setOrder(); WORLD.ticketLight.intensity=1.5; WORLD.ticketWin.material.color.set(0xffe7a0); blip(900,0.1,'square',0.1);
-  dale('Good. Lights are on. Now the survey: three photos for the buyer. Fountain, carousel, coaster. Use the body cam.',7);
+  dale('Good. Lights are on. Now the survey: three photos for the buyer. Fountain, ferris wheel, coaster. Use the body cam.',7);
 }
 function photoTaken(t){
-  t.done=true; photosTaken++; setOrder(); shotWait=3;
+  t.done=true; later(0.5,checkpoint); photosTaken++; setOrder(); shotWait=3;
   if(photosTaken===1){
     later(4,()=>{ musicDuck(4); }); later(5,()=>{ const d=dogs[0]; d.active=true; placeDog(d,11,3.35,-52,{away:false}); });
     later(7,()=>dale('Mm. You get a good shot? ...The park ran a dog theme. Don\'t let it bother you.',6));
@@ -1355,7 +1357,7 @@ function activateDogs(n){
     const c=WORLD.dogSpots.filter(s=>Math.hypot(s.x-player.pos.x,s.z-player.pos.z)>30&&!seenPoint(_t.set(s.x,s.y+1.6,s.z))); if(c.length){ const s=pick(c); placeDog(d,s.x,s.y,s.z,{away:Math.random()<0.3}); } }
 }
 function powerOn(){
-  powered=true; lamps.forEach((l,i)=>{ if(l.camp||l.x===0&&l.z===108) return; setTimeout(()=>lampOn(l,1.5+Math.random()),i*60); });
+  powered=true; later(0.5,checkpoint); lamps.forEach((l,i)=>{ if(l.camp||l.x===0&&l.z===108) return; setTimeout(()=>lampOn(l,1.5+Math.random()),i*60); });
   WORLD.deco.forEach((l,i)=>setTimeout(()=>lampOn(l,1+Math.random()),400+i*25));
   WORLD.wheelBulbs.forEach(b=>b.material.opacity=0.9);
   setFog(0.0135); startMusicBox(WORLD.C.carousel.x,3,WORLD.C.carousel.z);
@@ -1375,7 +1377,7 @@ function breakerDone(){
 }
 function revealBody(k){ const b=WORLD.bodies[k]; b.visible=true; if(b.userData.pool) b.userData.pool.visible=true; if(k==='jax'&&WORLD.jaxPool) WORLD.jaxPool.visible=true; }
 function sigilBroken(s){
-  s.broken=true; sigilsBroken++; s.mesh.visible=false; stinger(); setOrder();
+  s.broken=true; sigilsBroken++; later(0.5,checkpoint); s.mesh.visible=false; stinger(); setOrder();
   noiseBurst(1.5,120,0.7,0.3); blip(55,1.4,'sawtooth',0.3);
   killLamps(0.18); boxWarp=Math.min(1,sigilsBroken*0.3);
   setMusic({distort:Math.min(0.9,0.3+sigilsBroken*0.2)}); activateDogs(2); dogRate=Math.max(0.5,1-sigilsBroken*0.15);
@@ -1385,7 +1387,7 @@ function sigilBroken(s){
   if(!sextonSpawned&&sigilsBroken>=1){ sextonSpawned=true; later(6,()=>{ spawnSexton(); say('You hear someone humming. It is not coming from the speakers.',5); }); }
   if(sigilsBroken===2&&!choir2Spawned){ choir2Spawned=true; later(5,()=>spawnChoir(choirs[1],30,45)); }
   if(sigilsBroken>=4){
-    stage=4; setOrder(); WORLD.gateN.active=false; WORLD.campFire.on=true; lampOn(WORLD.campFire,2);
+    stage=4; setOrder(); later(0.5,checkpoint); WORLD.gateN.active=false; WORLD.campFire.on=true; lampOn(WORLD.campFire,2);
     lamps.filter(l=>l.camp).forEach(l=>lampOn(l,1));
     later(2,()=>{ say('Far to the north, something heavy swings open.',5); noiseBurst(1.5,140,0.7,0.4); });
     later(8,()=>dale('The north gate... Please. Please don\'t go through the maze.',5));
@@ -1403,7 +1405,7 @@ function endGame(){
   if(choirVoice) choirVoice.gain.gain.value=0; if(sextonVoice) sextonVoice.gain.gain.value=0; stopMusicBox(); setMusic({vol:0});
   choirs.forEach(c=>c.g.visible=false); sexton.g.visible=false; Object.values(mons).flat().forEach(m=>{ if(m.despawn) m.despawn(); });
   const c=WORLD.campSigil, n=dogs.length+1, counted=seenDogSet.size;
-  const ring=[]; for(let i=0;i<n;i++){ const d=i<dogs.length?dogs[i]:spawnDog(false); d.active=false; const a=i/n*TAU; placeDog(d,c.x+Math.cos(a)*9,0,c.z+Math.sin(a)*9,{}); d.armR.rotation.set(0,0,-0.12); ring.push(d); }
+  const ring=[]; for(let i=0;i<n;i++){ const d=i<dogs.length?dogs[i]:spawnDog(false); d.active=false; const a=i/n*TAU; placeDog(d,c.x+Math.cos(a)*9,0,c.z+Math.sin(a)*9,{keepOthers:true}); d.armR.rotation.set(0,0,-0.12); ring.push(d); }
   later(2,()=>say('...',3));
   later(8,()=>{ $('emsg').innerHTML='You saw '+counted+' dogs tonight.<br><br>There are '+n+' standing here.<br><br><span style="color:#777">DOGGYWOOD &mdash; vertical slice complete.<br>Tell me what scared you, what dragged, and what to build next.</span>'; $('end').style.display='flex'; try{document.exitPointerLock();}catch(e){} });
 }
@@ -1440,7 +1442,7 @@ function developShot(){
 // ---------- input ----------
 addEventListener('keydown',e=>{
   keys[e.code]=true;
-  if(e.code==='KeyR'&&dead) location.reload();
+  if(e.code==='KeyR'&&dead) respawn();
   if(!started||dead||ended) return;
   if(e.code==='KeyF'){ flashOn=!flashOn; blip(1400,0.04,'square',0.08); }
   if(e.code==='KeyQ'){ camOn=!camOn&&battery>1; blip(camOn?1900:700,0.05,'square',0.08); applyCam(); }
@@ -1458,7 +1460,7 @@ $('start').addEventListener('click',()=>{
   try{ const d=document.documentElement, f=d.requestFullscreen||d.webkitRequestFullscreen; if(f&&!document.fullscreenElement){ const r=f.call(d); if(r&&r.catch) r.catch(()=>{}); } }catch(e){}
   try{ navigator.gamepadInputEmulation='gamepad'; }catch(e){}
   try{ const r=canvas.requestPointerLock(); if(r&&r.catch) r.catch(()=>{}); }catch(e){}
-  $('start').style.display='none'; started=true; setOrder(); startScore();
+  $('start').style.display='none'; started=true; setOrder(); startScore(); later(1,checkpoint);
   if(WORLD.car) musicAt(WORLD.car.position.x,1,WORLD.car.position.z);
   later(5,()=>dale('You in? Gate\'s open. Plaza is straight ahead. Booth first.',6));
 });
@@ -1546,7 +1548,7 @@ function update(dt){
       if(player.stepT>iv){player.stepT=0; if(!player.crouch||Math.random()<.4) step(sprint);}
       player.bob+=dt*(sprint?11:7);
     }
-    player.noise=moving?(sprint?24:(player.crouch?2.5:9)):0;
+    player.noise=moving?(sprint?20:(player.crouch?2.5:7.5)):0;
     resolveCircle(player.pos,0.42);
     player.pos.x=clamp(player.pos.x,-130,130); player.pos.z=clamp(player.pos.z,-212,135);
   } else player.noise=0;
@@ -1583,7 +1585,7 @@ function update(dt){
   else if(sig&&!ended){ P.textContent=holdT>0.05?'':'[hold E] Break the sigil'; }
   else P.textContent='';
   const need=sig===WORLD.campSigil?9:6;
-  if(sig&&!ended&&keys.KeyE&&!dead){ holdT+=dt; player.noise=Math.max(player.noise,22); if(hymnG&&AC) hymnG.gain.linearRampToValueAtTime(0.14+0.12*Math.min(1,holdT/need),AC.currentTime+0.2);
+  if(sig&&!ended&&keys.KeyE&&!dead){ holdT+=dt; player.noise=Math.max(player.noise,18); if(hymnG&&AC) hymnG.gain.linearRampToValueAtTime(0.14+0.12*Math.min(1,holdT/need),AC.currentTime+0.2);
     if(sig===WORLD.campSigil) ringChoirs.forEach((c,i)=>{ c.rotation.y=Math.atan2(player.pos.x-c.position.x,player.pos.z-c.position.z); });
   } else holdT=Math.max(0,holdT-dt*0.7);
   $('bar').style.display=holdT>0.05?'block':'none'; $('bar').firstElementChild.style.width=Math.min(100,holdT/need*100)+'%';
@@ -1722,6 +1724,45 @@ function scoreTick(){
   SCORE.gain.gain.setTargetAtTime(target,now,0.8);
   SCORE.lp.frequency.setTargetAtTime(1500-1000*d,now,1.5);
 }
+
+// ---------- checkpoints, hidden health, and things you hear but don't see ----------
+let CP=null;
+function checkpoint(){ if(dead||ended) return; CP={x:player.pos.x,z:player.pos.z,yaw:player.yaw}; const c=$('clock'); if(c){ c.dataset.cp=1; setTimeout(()=>{ delete c.dataset.cp; },2500); } }
+function allMons(){ const a=[]; for(const k in mons){ const m=mons[k]; if(Array.isArray(m)) a.push(...m); else if(m) a.push(m); } return a; }
+function respawn(){
+  if(!dead) return; if(!CP){ location.reload(); return; }
+  dead=false; $('death').style.display='none';
+  player.pos.x=CP.x; player.pos.z=CP.z; player.yaw=CP.yaw; player.pitch=0; player.hp=3; player.hurtT=2.5; player.stun=0; player.lastHit=tNow;
+  // whatever got you goes back into the dark
+  allMons().forEach(m=>{ if(m.active&&Math.hypot(m.g.position.x-player.pos.x,m.g.position.z-player.pos.z)<28) m.retreat(30); });
+  choirs.forEach(c=>{ if(c.active&&Math.hypot(c.g.position.x-player.pos.x,c.g.position.z-player.pos.z)<30){ c.state='patrol'; const w=CHOIR_WP[c.set][Math.floor(Math.random()*CHOIR_WP[c.set].length)]; c.g.position.set(w[0],0,w[1]); } });
+  if(sexton.active) spawnSexton();
+  try{ const r=canvas.requestPointerLock(); if(r&&r.catch) r.catch(()=>{}); }catch(e){}
+  say('...',1.5);
+}
+let rumT=18;
+setInterval(()=>{
+  if(!started||dead||ended) return;
+  // health comes back slowly if you stay out of trouble; the red edge shows how hurt you are
+  if(player.hp<3&&tNow-(player.lastHit||0)>12){ player.hp++; player.lastHit=tNow; }
+  const h=$('hurt'); if(!(player.flashT>0)) h.style.opacity=player.hp>=3?0:(3-player.hp)*0.28;
+  // every so often: a footstep, a knock, a scrape. Usually from where something really is
+  rumT-=0.25; if(rumT>0) return; rumT=14+Math.random()*20;
+  const hidden=allMons().filter(m=>m.active&&!m.frozen).map(m=>m.g.position).concat(choirs.filter(c=>c.active).map(c=>c.g.position));
+  let pos; const near=hidden.filter(p=>Math.hypot(p.x-player.pos.x,p.z-player.pos.z)<45);
+  if(near.length&&Math.random()<0.7) pos=near[Math.floor(Math.random()*near.length)];
+  else { const a=Math.random()*TAU, r=12+Math.random()*20; pos={x:player.pos.x+Math.cos(a)*r,y:1,z:player.pos.z+Math.sin(a)*r}; }
+  const P={x:pos.x,y:1,z:pos.z}, kind=Math.floor(Math.random()*3);
+  if(kind===0){ for(let i=0;i<3;i++) setTimeout(()=>noiseBurst(0.09,190+Math.random()*50,0.22,0.8,P),i*430); }
+  else if(kind===1){ noiseBurst(0.12,420,0.3,2,P); setTimeout(()=>noiseBurst(0.12,420,0.26,2,P),260); }
+  else noiseBurst(0.9,1300,0.12,0.6,P);
+},250);
+setInterval(()=>{ if(player.flashT>0){ player.flashT-=0.1; } },100);
+
+const boothDog=(()=>{ const m=makeDog(false); const g=m.g; g.position.set(-9.1,0.42,54.2); g.rotation.set(0.15,Math.PI/2+0.35,1.38); scene.add(g);
+  m.head.rotation.set(0.5,0.4,0.7); if(m.armR) m.armR.rotation.set(0.2,0,-0.5); return {g,away:0}; })();
+setInterval(()=>{ if(!boothDog.g.visible||stage<1) return;
+  if(seenPoint(_t.set(boothDog.g.position.x,1,boothDog.g.position.z))) boothDog.away=0; else if((boothDog.away+=0.25)>2.5) boothDog.g.visible=false; },250);
 </script>
 </body>
 </html>
