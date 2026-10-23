@@ -1653,7 +1653,9 @@ function update(dt){
   camera.position.set(player.pos.x,eye,player.pos.z);
   camera.rotation.order='YXZ'; camera.rotation.y=player.yaw; camera.rotation.x=player.pitch;
   zoom+=(zoomTarget-zoom)*Math.min(1,dt*6); camera.fov=BASE_FOV/zoom; camera.updateProjectionMatrix();
-  { const want=camOn?(zoom>2.4?720:540):270; if(want!==resH){ resH=want; resize(); } }
+  { let want=camOn?(zoom>2.4?720:540):270;
+    if(camOn&&monsterInFrame()) want=zoom<1.4?300:zoom<2.2?150:zoom<3.5?84:zoom<5?52:36;   // you can't study them through the lens
+    if(want!==resH){ resH=want; resize(); } }
   camera.updateMatrixWorld(true); updateListener();
   flash.visible=flashOn&&!ended; flash.color.set(camOn?0xb8ffc8:0xfff0cc); flash.angle=0.46/Math.max(1,zoom*0.6);
   // trail for the Sexton
@@ -2082,8 +2084,10 @@ setInterval(()=>{ if(!powered||paused) return; const sp=1+rideSpin*0.4;
 
 // ---------- the dog: shows up after you finish something, pointing at what's next ----------
 function nextTarget(){ if(stage===1){ const t=photoTargets.find(t=>!t.done); return t?t.pos:null; } try{ return guideTarget(); }catch(e){ return null; } }
+let dogExplained=false;
 function dogNext(){
   if(dead||ended) return; const d=dogs[1], tg=nextTarget(); if(!d||!tg) return;
+  if(!dogExplained&&!daleTaken){ dogExplained=true; later(6,()=>{ if(!daleTaken) dale('Saw the mascot, huh? Old staff swore that dog always pointed lost kids the right way. If he\'s pointing, I\'d follow it.',7); }); }
   d.active=true; d.mode='guide'; d.unseen=0; d.wasSeen=false;
   if(Math.random()<0.5&&tryBehind(d,tg,true)) return;          // half the time: right behind you
   guidePlace(d,tg);                                              // otherwise: ahead of you, pointing the way
@@ -2288,6 +2292,18 @@ function tameGlow(sp){ if(sp.userData.tamed) return; sp.userData.tamed=true;
   sp.onAfterRender=()=>{ if(sp.userData.op!=null) sp.material.opacity=sp.userData.op; }; }
 function tameAll(){ scene.traverse(o=>{ if(o.isSprite) tameGlow(o); }); }
 tameAll(); setInterval(tameAll,2000);
+
+// is a monster on screen right now (and not behind a wall)?
+const _mf=new THREE.Vector3();
+function monsterInFrame(){
+  const test=p=>{ _mf.set(p.x,1.5,p.z); const d=camera.position.distanceTo(_mf); if(d>90) return false; const q=_mf.clone().project(camera);
+    return q.z<1&&Math.abs(q.x)<1&&Math.abs(q.y)<1&&losClear(camera.position,_mf); };
+  for(const m of allMons()) if(m.active&&m.g.visible&&test(m.g.position)) return true;
+  for(const c of choirs) if(c.active&&c.g.visible&&test(c.g.position)) return true;
+  if(sexton.active&&sexton.g&&sexton.g.visible&&test(sexton.g.position)) return true;
+  if(carWatcher.visible&&test(carWatcher.position)) return true;
+  return false;
+}
 </script>
 </body>
 </html>
