@@ -82,7 +82,7 @@
 <div id="refs" style="position:fixed;inset:0;display:none;align-items:center;justify-content:center;background:rgba(0,0,0,.85);z-index:10;color:#ffd35a;font-size:28px;cursor:pointer">[ press A to go back to full screen ]</div>
 <div id="sigloss"><div class="snow"></div><p>SIGNAL LOST</p></div>
 <div id="death"><h1 style="color:#c22;letter-spacing:.3em">YOU DIED</h1><p id="dmsg"></p><p class="opt" id="dcont">&#9654; Continue from checkpoint <span class="k2" id="dkey">[R]</span></p><p style="color:#8a8070;font-size:13px">Pause menu: <span id="dmkey">Esc</span></p></div>
-<div id="menu"><div class="box"><h2>PAUSED</h2><p class="hint" style="margin:-10px 0 10px">build 10-23g</p><div id="mitems"></div><div id="mhelp"></div><p class="hint" id="mdiag" style="color:#9aa"></p><p class="hint" id="mhint"></p></div></div>
+<div id="menu"><div class="box"><h2>PAUSED</h2><p class="hint" style="margin:-10px 0 10px">build 10-23h</p><div id="mitems"></div><div id="mhelp"></div><p class="hint" id="mdiag" style="color:#9aa"></p><p class="hint" id="mhint"></p></div></div>
 <div id="end"><h1>&mdash;</h1><p id="emsg"></p></div>
 
 <script>/**
@@ -126,6 +126,7 @@ function setupPost(){
 }
 function renderMain(){
   if(!POST.rt) setupPost();
+  if(window.followLights) followLights();
   const sz=renderer.getSize(new THREE.Vector2()); if(POST.rt.width!==sz.x||POST.rt.height!==sz.y){ POST.rt.setSize(sz.x,sz.y); POST.mat.uniforms.res.value.set(sz.x,sz.y); }
   POST.mat.uniforms.cam.value=camOn?1:0; POST.mat.uniforms.fuzz.value=POST.fuzz; POST.mat.uniforms.rows.value=Math.min(POST.rows,sz.y);
   renderer.setRenderTarget(POST.rt); renderer.render(scene,camera); renderer.setRenderTarget(null); renderer.render(POST.scene,POST.cam);
@@ -1436,8 +1437,8 @@ function makeKid(col){
   const g=new THREE.Group(); const m=lam({color:col});
   mesh(BG(0.5,1.0,0.3),m,0,1.0,0,g); mesh(SG(0.2,6,5),lam({color:0x8d7a6a}),0,1.7,0,g);
   [-0.15,0.15].forEach(x=>mesh(BG(0.2,0.6,0.22),m,x,0.3,0,g));
-  const li=new THREE.PointLight(0xdfe8ff,1.3,14,2); li.position.set(0.4,1.3,0.5); g.add(li);
-  g.visible=false; scene.add(g); g.userData.li=li; return g;
+  const li=(window.KIDL&&KIDL.length)?KIDL.shift():new THREE.PointLight(0xdfe8ff,1.3,14,2); li.intensity=1.3; li.position.set(0.4,1.3,0.5); g.add(li);
+  g.visible=false; scene.add(g); g.userData.li=li; if(window.pinLight) pinLight(li); return g;
 }
 function kidsEvent(){
   kidA=makeKid(0x22304a); kidB=makeKid(0x4a2230);
@@ -2075,7 +2076,7 @@ function drawMenu(){
     :'WASD: move &nbsp; Mouse: look<br>E: interact (hold)<br>Q: night-vision camera &nbsp; Click: photo &nbsp; Scroll: zoom<br>Shift: sprint (loud) &nbsp; C: crouch (quiet)';
 }
 function diagLine(){ const c=camera.position, f=n=>Number.isFinite(n)?(+n.toFixed(2)):String(n); const sz=renderer.getSize(new THREE.Vector2()); let gl='?'; try{ gl=renderer.getContext().isContextLost()?'LOST':'ok'; }catch(x){}
-  return 'build 10-23g   diag  pos '+f(c.x)+','+f(c.y)+','+f(c.z)+'  yaw '+f(player.yaw)+' pitch '+f(player.pitch)+'  fov '+f(camera.fov)+' zoom '+f(zoom)+'  fog '+f(scene.fog.density)+'  size '+sz.x+'x'+sz.y+' rows '+POST.rows+'  gl '+gl+' lost '+GL_LOST+'/'+GL_RESTORED+'  cam '+camOn+'  fuzz '+f(POST.fuzz)+'  intro '+INTRO.phase+'  stage '+stage; }
+  return 'build 10-23h   diag  pos '+f(c.x)+','+f(c.y)+','+f(c.z)+'  yaw '+f(player.yaw)+' pitch '+f(player.pitch)+'  fov '+f(camera.fov)+' zoom '+f(zoom)+'  fog '+f(scene.fog.density)+'  size '+sz.x+'x'+sz.y+' rows '+POST.rows+'  gl '+gl+' lost '+GL_LOST+'/'+GL_RESTORED+'  cam '+camOn+'  fuzz '+f(POST.fuzz)+'  intro '+INTRO.phase+'  stage '+stage; }
 function openMenu(){ if(paused||!started||dead||ended) return; paused=true; try{ $('mdiag').textContent=diagLine(); }catch(x){ $('mdiag').textContent='diag failed: '+x.message; } menuSel=0; $('mhelp').style.display='none'; drawMenu(); $('menu').style.display='flex'; try{document.exitPointerLock();}catch(e){} if(AC&&AC.state==='running') AC.suspend(); }
 function closeMenu(){ if(!paused) return; paused=false; $('menu').style.display='none'; if(AC&&AC.state==='suspended') AC.resume(); try{ const r=canvas.requestPointerLock(); if(r&&r.catch) r.catch(()=>{}); }catch(e){} }
 function menuMove(d){ menuSel=(menuSel+d+MENU.length)%MENU.length; blip(700,0.03,'square',0.03); drawMenu(); }
@@ -2192,37 +2193,45 @@ setInterval(()=>{ if(!started||paused||dead) return; allMons().forEach(m=>{ if(!
 // =====================================================================
 const INTRO={phase:'off',z:1160,x:0,vx:0,speed:14,t:0,shake:0,bumpT:-9,skip:0};
 // ---- the road in ----
-(()=>{ const asphalt=lam({color:0x34363b}), paint=bas({color:0xd8d0a8}), rail=lam({color:0x7d8287}), post=lam({color:0x3d3f42});
-  const road=new THREE.Mesh(new THREE.PlaneGeometry(9.5,970),asphalt); road.rotation.x=-Math.PI/2; road.position.set(0,0.015,745); scene.add(road);
-  // the paving gives out; the last stretch to the park is dirt, with tyre ruts and grass down the middle
+// Everything repeated (dashes, rails, posts, stones, trees) is drawn in a few batches (instancing), not hundreds of separate objects.
+// The far part of the road only exists during the drive; it's switched off once you park.
+const ROAD={near:new THREE.Group(),far:new THREE.Group()};
+(()=>{ scene.add(ROAD.near,ROAD.far);
+  const asphalt=lam({color:0x34363b}), paint=bas({color:0xd8d0a8}), rail=lam({color:0x7d8287}), post=lam({color:0x3d3f42}), wood=lam({color:0x3b2c1e});
+  const UB=new THREE.BoxGeometry(1,1,1), US=new THREE.SphereGeometry(1,5,4), m4=new THREE.Matrix4(), q=new THREE.Quaternion(), e=new THREE.Euler();
+  const inst=(geo,mat,list,grp)=>{ const im=new THREE.InstancedMesh(geo,mat,list.length);
+    list.forEach((o,i)=>{ e.set(0,0,o[6]||0); q.setFromEuler(e); m4.compose(V(o[0],o[1],o[2]),q,V(o[3],o[4],o[5])); im.setMatrixAt(i,m4); }); grp.add(im); return im; };
+  const flat=(w,d,mat,x,y,z,grp)=>{ const p=new THREE.Mesh(new THREE.PlaneGeometry(w,d),mat); p.rotation.x=-Math.PI/2; p.position.set(x,y,z); grp.add(p); return p; };
+  // far: asphalt, lane paint, guardrails
+  flat(9.5,970,asphalt,0,0.015,745,ROAD.far);
+  const dashes=[]; for(let z=268;z<1230;z+=9) dashes.push([0,0.03,z,0.14,0.01,3.2]);
+  [-1,1].forEach(sd=>dashes.push([sd*4.35,0.03,748,0.12,0.01,960]));
+  inst(UB,paint,dashes,ROAD.far);
+  const rails=[], posts=[]; [-1,1].forEach(sd=>{ for(let z=262;z<1230;z+=24){ rails.push([sd*5.0,0.62,z+12,0.12,0.32,24]); posts.push([sd*5.0,0.35,z,0.14,0.7,0.14]); } });
+  inst(UB,rail,rails,ROAD.far); inst(UB,post,posts,ROAD.far);
+  const edge=[]; for(let k=0;k<9;k++) edge.push([-4+k*1.0,0.02,260+Math.random()*0.8,0.9+Math.random()*0.6,0.03,0.5+Math.random()*0.7]);
+  inst(UB,asphalt,edge,ROAD.near);
+  // near: the dirt stretch you can still see from the parking spot (sits just above the old road so they don't flicker)
   const dirt=lam({color:0x4a3c2c}), rut=lam({color:0x2e251b}), grass=lam({color:0x2c3a26});
-  const dr=new THREE.Mesh(new THREE.PlaneGeometry(9,160),dirt); dr.rotation.x=-Math.PI/2; dr.position.set(0,0.014,180); scene.add(dr);
-  [-1.05,1.05].forEach(x=>{ const r=new THREE.Mesh(new THREE.PlaneGeometry(0.55,160),rut); r.rotation.x=-Math.PI/2; r.position.set(x,0.02,180); scene.add(r); });
-  const gm=new THREE.Mesh(new THREE.PlaneGeometry(0.7,160),grass); gm.rotation.x=-Math.PI/2; gm.position.set(0,0.022,180); scene.add(gm);
-  for(let k=0;k<70;k++) mesh(SG(0.12+Math.random()*0.2,5,4),lam({color:0x3d342a}),(Math.random()-0.5)*8.5,0.02,102+Math.random()*156,scene).scale.y=0.35;   // stones
-  // ragged edge where the asphalt ends
-  for(let k=0;k<9;k++) mesh(BG(0.9+Math.random()*0.6,0.03,0.5+Math.random()*0.7),asphalt,-4+k*1.0,0.018,260+Math.random()*0.8,scene);
-  for(let z=268;z<1230;z+=9) mesh(BG(0.14,0.01,3.2),paint,0,0.03,z,scene);
-  const wood=lam({color:0x3b2c1e});
-  [-1,1].forEach(sd=>{ mesh(BG(0.12,0.01,960),paint,sd*4.35,0.03,748,scene);
-    for(let z=110;z<262;z+=6){ mesh(BG(0.16,1.0,0.16),wood,sd*5.0,0.5,z,scene,0,0,(Math.random()-0.5)*0.15); }   // old wooden fence posts along the dirt
-    mesh(BG(0.1,0.12,152),wood,sd*5.0,0.75,186,scene);
-    for(let z=262;z<1230;z+=24){ mesh(BG(0.12,0.32,24),rail,sd*5.0,0.62,z+12,scene); mesh(BG(0.14,0.7,0.14),post,sd*5.0,0.35,z,scene); } });
-  // trees along the road
-  const N=640, cones=new THREE.InstancedMesh(new THREE.ConeGeometry(2.6,11,6),M.tree,N), trunks=new THREE.InstancedMesh(new THREE.CylinderGeometry(0.3,0.45,3,5),M.trunk,N);
-  const m=new THREE.Matrix4(), q=new THREE.Quaternion(); let n=0;
-  while(n<N){ const sd=Math.random()<0.5?-1:1, x=sd*(8+Math.pow(Math.random(),1.6)*60), z=225+Math.random()*1000, sc=0.8+Math.random()*0.8;
-    m.compose(V(x,6*sc,z),q,V(sc,sc,sc)); cones.setMatrixAt(n,m); m.compose(V(x,1.5,z),q,V(1,1,1)); trunks.setMatrixAt(n,m); n++; }
-  scene.add(cones,trunks);
+  flat(9,160,dirt,0,0.03,180,ROAD.near); [-1.05,1.05].forEach(x=>flat(0.55,160,rut,x,0.035,180,ROAD.near)); flat(0.7,160,grass,0,0.04,180,ROAD.near);
+  const stones=[]; for(let k=0;k<70;k++){ const r=0.12+Math.random()*0.2; stones.push([(Math.random()-0.5)*8.5,0.04,102+Math.random()*156,r,r*0.35,r]); }
+  inst(US,lam({color:0x3d342a}),stones,ROAD.near);
+  const wposts=[]; [-1,1].forEach(sd=>{ for(let z=110;z<262;z+=6) wposts.push([sd*5.0,0.5,z,0.16,1.0,0.16,(Math.random()-0.5)*0.15]); wposts.push([sd*5.0,0.75,186,0.1,0.12,152]); });
+  inst(UB,wood,wposts,ROAD.near);
+  // trees along the road (near ones stay, far ones go when you park)
+  const treeSet=(n,zMin,zMax,grp)=>{ const cones=new THREE.InstancedMesh(new THREE.ConeGeometry(2.6,11,6),M.tree,n), trunks=new THREE.InstancedMesh(new THREE.CylinderGeometry(0.3,0.45,3,5),M.trunk,n);
+    for(let i=0;i<n;i++){ const sd=Math.random()<0.5?-1:1, x=sd*(8+Math.pow(Math.random(),1.6)*60), z=zMin+Math.random()*(zMax-zMin), sc=0.8+Math.random()*0.8;
+      m4.compose(V(x,6*sc,z),q.identity(),V(sc,sc,sc)); cones.setMatrixAt(i,m4); m4.compose(V(x,1.5,z),q,V(1,1,1)); trunks.setMatrixAt(i,m4); }
+    grp.add(cones,trunks); };
+  treeSet(90,225,330,ROAD.near); treeSet(520,330,1225,ROAD.far);
   // old road signs counting down to the park
-  const sign=(z,x,lines,big)=>{ const c=document.createElement('canvas'); c.width=512; c.height=256; const g=c.getContext('2d');
+  const sign=(z,x,lines,big,grp)=>{ const c=document.createElement('canvas'); c.width=512; c.height=256; const g=c.getContext('2d');
     g.fillStyle='#2f4a35'; g.fillRect(0,0,512,256); g.strokeStyle='#d8d2bc'; g.lineWidth=10; g.strokeRect(12,12,488,232);
     g.fillStyle='#e6dfc8'; g.textAlign='center'; lines.forEach((t,k)=>{ g.font=(k===0?'bold 64px':'44px')+' Courier New'; g.fillText(t,256,96+k*78); });
     for(let k=0;k<1400;k++){ g.fillStyle='rgba(0,0,0,'+(Math.random()*0.35)+')'; g.fillRect(Math.random()*512,Math.random()*256,2+Math.random()*6,2+Math.random()*4); }   // weathering
-    const tex=new THREE.CanvasTexture(c); const w=big?6:4.4;
-    const b=new THREE.Mesh(new THREE.PlaneGeometry(w,w/2),lam({map:tex})); b.position.set(x,2.6,z); b.rotation.y=0; scene.add(b);
-    [-0.4,0.4].forEach(o=>mesh(BG(0.12,2.6,0.12),post,x+o*w,1.3,z+0.05,scene)); };
-  sign(900,-6.8,['DOGGYWOOD PARK','3 MILES']); sign(560,6.8,['DOGGYWOOD','1 MILE','FAMILY FUN!']); sign(330,-6.8,['DOGGYWOOD PARK','NEXT RIGHT']); sign(205,6.8,['PARK CLOSED','NO TRESPASSING'],true);
+    const w=big?6:4.4; const b=new THREE.Mesh(new THREE.PlaneGeometry(w,w/2),lam({map:new THREE.CanvasTexture(c)})); b.position.set(x,2.6,z); grp.add(b);
+    inst(UB,post,[-0.4,0.4].map(o=>[x+o*w,1.3,z+0.05,0.12,2.6,0.12]),grp); };
+  sign(900,-6.8,['DOGGYWOOD PARK','3 MILES'],false,ROAD.far); sign(560,6.8,['DOGGYWOOD','1 MILE','FAMILY FUN!'],false,ROAD.far); sign(330,-6.8,['DOGGYWOOD PARK','NEXT RIGHT'],false,ROAD.far); sign(205,6.8,['PARK CLOSED','NO TRESPASSING'],true,ROAD.near);
   // a faded billboard of the mascot, grinning down at the road
   const c=document.createElement('canvas'); c.width=512; c.height=256; const g=c.getContext('2d');
   g.fillStyle='#d8c9a2'; g.fillRect(0,0,512,256); g.fillStyle='#c79a5c'; g.beginPath(); g.arc(120,130,82,0,7); g.fill();
@@ -2231,8 +2240,8 @@ const INTRO={phase:'off',z:1160,x:0,vx:0,speed:14,t:0,shake:0,bumpT:-9,skip:0};
   g.strokeStyle='#000'; g.lineWidth=4; g.beginPath(); g.arc(120,166,26,0.2,Math.PI-0.2); g.stroke();
   g.fillStyle='#7a1414'; g.font='bold 54px Courier New'; g.textAlign='left'; g.fillText('DOGGYWOOD',220,110); g.fillStyle='#3a2a1a'; g.font='30px Courier New'; g.fillText('Where every dog',224,160); g.fillText('has its day!',224,196);
   for(let k=0;k<3000;k++){ g.fillStyle='rgba(20,15,10,'+(Math.random()*0.4)+')'; g.fillRect(Math.random()*512,Math.random()*256,1+Math.random()*5,1+Math.random()*3); }
-  const bb=new THREE.Mesh(new THREE.PlaneGeometry(12,6),lam({map:new THREE.CanvasTexture(c)})); bb.position.set(-12,6.5,450); scene.add(bb);
-  [-4,4].forEach(o=>mesh(BG(0.25,5,0.25),post,-12+o,2.5,450.1,scene));
+  const bb=new THREE.Mesh(new THREE.PlaneGeometry(12,6),lam({map:new THREE.CanvasTexture(c)})); bb.position.set(-12,6.5,450); ROAD.far.add(bb);
+  inst(UB,post,[[-16,2.5,450.1,0.25,5,0.25],[-8,2.5,450.1,0.25,5,0.25]],ROAD.far);
 })();
 // ---- inside the car: dashboard, wheel, pillars, headlights, trunk lid ----
 const CAB={};
@@ -2314,7 +2323,7 @@ function introDrive(dt){
 function introParked(){
   const I=INTRO; I.phase='trunk'; I.x=0; I.z=112;
   WORLD.car.position.set(0,0,112); WORLD.car.rotation.y=Math.PI; musicAt(0,1,112); music.vol=0.55/3; applyMusic(); $('titlecard').style.opacity=0;
-  if(CAB.g) CAB.g.visible=false; if(CAB.hl) CAB.hl.intensity=1.2;
+  if(CAB.g) CAB.g.visible=false; if(CAB.hl) CAB.hl.intensity=1.2; dropFarRoad();
   player.pos.x=0.3; player.pos.z=116.9; player.yaw=0.05; player.pitch=-0.28;
   thump(0.4); noiseBurst(0.12,1600,0.2,1);                        // door shuts
   setTimeout(()=>{ $('fade').style.opacity=0; },150);
@@ -2383,6 +2392,56 @@ setInterval(()=>{
   GHOST.clackT-=dt; if(GHOST.clackT<=0){ GHOST.clackT=Math.max(0.12,0.5-GHOST.v*30); noiseBurst(0.05,700+Math.random()*300,0.18,2,{x:lead.x,y:lead.y,z:lead.z}); }
   if(slope<-0.35&&!GHOST.lapScream){ GHOST.lapScream=true; if(Math.random()<0.4) scream(V(lead.x,lead.y,lead.z)); }
 },50);
+
+function dropFarRoad(){
+  if(!ROAD.far||!ROAD.far.parent) return;
+  const keep=new Set(); ROAD.near.traverse(o=>{ if(o.geometry) keep.add(o.geometry); });
+  ROAD.far.traverse(o=>{ if(o.geometry&&!keep.has(o.geometry)) o.geometry.dispose(); if(o.material&&o.material.map) o.material.map.dispose(); });
+  scene.remove(ROAD.far); ROAD.far=null;
+}
+// ---------- only draw what the fog lets you see ----------
+// Static scenery past the point where the fog hides it completely is moved to a layer the camera doesn't draw.
+// (Uses layers, not .visible, so the game's own show/hide logic is untouched.)
+const CULL=[]; let cullBuilt=false;
+function buildCull(){
+  scene.updateMatrixWorld(true);
+  scene.children.forEach(o=>{ if(!o.isMesh||o.isInstancedMesh||!o.geometry||(o.material&&o.material.fog===false)) return;
+    if(!o.geometry.boundingSphere) o.geometry.computeBoundingSphere(); const bs=o.geometry.boundingSphere;
+    const c=bs.center.clone().applyMatrix4(o.matrixWorld), r=bs.radius*Math.max(o.scale.x,o.scale.y,o.scale.z);
+    CULL.push({o,c,r}); });
+  cullBuilt=true;
+}
+setInterval(()=>{
+  if(!started) return; if(!cullBuilt) buildCull();
+  const d=Math.max(0.004,scene.fog.density), cut=Math.min(320,Math.max(70,2.7/d)), cp=camera.position;
+  for(const e of CULL){ const far=cp.distanceTo(e.c)-e.r>cut; if(far!==e.off){ e.off=far; e.o.layers.set(far?1:0); } }
+},250);
+
+// ---------- lights: a fixed set for the whole game, so the lighting code never has to be rebuilt mid-play ----------
+// (Adding, removing or hiding a light forces every surface's shader to recompile at once, which can make the browser drop the GPU.)
+const PINNED=[];
+function chainVisible(o){ for(let p=o;p;p=p.parent){ if(!p.visible) return false; } return true; }
+function pinLight(l){
+  if(!l||l.userData.pinned) return; const par=l.parent; if(!par) return;
+  const anchor=new THREE.Object3D(); anchor.position.copy(l.position); par.add(anchor); par.remove(l); scene.add(l);
+  l.userData.pinned=true; l.userData.base=l.intensity; PINNED.push({l,anchor});
+}
+function followLights(){
+  for(const f of PINNED){ f.anchor.updateWorldMatrix(true,false); f.anchor.getWorldPosition(f.l.position);
+    if(chainVisible(f.anchor)){ if(f.l.userData.off){ f.l.intensity=f.l.userData.base; f.l.userData.off=false; } else f.l.userData.base=f.l.intensity; }
+    else if(!f.l.userData.off){ f.l.userData.base=f.l.intensity; f.l.intensity=0; f.l.userData.off=true; } }
+}
+var KIDL=[new THREE.PointLight(0xdfe8ff,0,14,2),new THREE.PointLight(0xdfe8ff,0,14,2)]; KIDL.forEach(l=>scene.add(l));
+(()=>{ try{
+  if(!CAB.g) buildCab();                                                   // the car interior exists from the start
+  CAB.g.children.forEach(o=>{ if(o.isLight) pinLight(o); });
+  if(sexton.g&&sexton.g.userData.light) pinLight(sexton.g.userData.light);
+  if(mons.usher&&mons.usher.g.userData.fl) pinLight(mons.usher.g.userData.fl);
+  flash.visible=false;
+  followLights(); scene.updateMatrixWorld(true);
+  renderer.compile(scene,camera);                                           // compile every surface's lighting now, on the title screen
+  setupPost(); renderer.compile(POST.scene,POST.cam);
+}catch(e){ reportErr(e,'prebuild'); } })();
 </script>
 </body>
 </html>
