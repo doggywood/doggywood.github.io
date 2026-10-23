@@ -7,7 +7,7 @@ try{ navigator.gamepadInputEmulation='gamepad'; }catch(e){}
 let mm=0, clicks=0, keys=[];
 addEventListener('mousemove',()=>mm++); addEventListener('click',()=>clicks++); addEventListener('keydown',e=>{keys.push(e.key);keys=keys.slice(-6);});
 function tick(){ const g=[...(navigator.getGamepads?navigator.getGamepads():[])].filter(Boolean);
-  let t='browser: '+navigator.userAgent.slice(-60)+'\nemulation setting: '+(navigator.gamepadInputEmulation===undefined?'NOT SUPPORTED':navigator.gamepadInputEmulation)+'\ncontrollers seen: '+g.length+'\n';
+  let t='browser: '+navigator.userAgent.slice(-60)+'\nemulation setting: '+(navigator.gamepadInputEmulation===undefined?'NOT SUPPORTED':navigator.gamepadInputEmulation)+'\nfull screen: '+(document.fullscreenElement?'YES':'no')+'\ncontrollers seen: '+g.length+'\n';
   g.forEach(p=>{ t+='\n'+p.id.slice(0,40)+'\n sticks: '+p.axes.map(a=>a.toFixed(2)).join('  ')+'\n buttons down: '+p.buttons.map((b,i)=>b.pressed?i:null).filter(v=>v!==null).join(',')+'\n'; });
   t+='\nmouse moves: '+mm+'   clicks: '+clicks+'   keys: '+keys.join(' ');
   document.getElementById('o').textContent=t; requestAnimationFrame(tick); }
