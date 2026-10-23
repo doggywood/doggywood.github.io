@@ -282,7 +282,8 @@ function litAt(x,z,pad){ for(const l of lamps){ if(l.on&&l.safe&&l._f&&Math.hypo
 let fogBase=0.022, fogTarget=0.022;
 function setFog(d){ fogTarget=d; }
 function updateFog(dt,camOn){
-  const t=camOn?fogTarget*0.45/Math.pow(zoom,1.1):fogTarget;   // zooming the body cam cuts through the fog
+  const px=player.pos.x, pz=player.pos.z, out=Math.max(0,Math.abs(px)-112,pz-58,-145-pz), outside=1+Math.min(1.6,out/14);
+  const t=(camOn?fogTarget*0.45/Math.pow(zoom,1.1):fogTarget)*outside;   // zooming the body cam cuts through the fog
   scene.fog.density+= (t-scene.fog.density)*Math.min(1,dt*(camOn?4:1.2));
 }
 
@@ -2030,6 +2031,43 @@ const dogAt=new Set();
 setInterval(()=>{ if(!started||dead||ended||paused||stage<1) return; const d=dogs[1], tg=nextTarget(); if(!d||!tg||d.g.visible) return;
   const key=Math.round(tg.x)+','+Math.round(tg.z); if(dogAt.has(key)) return;
   if(Math.hypot(tg.x-player.pos.x,tg.z-player.pos.z)<32){ dogAt.add(key); if(Math.random()<0.6){ d.active=true; d.mode='guide'; d.unseen=0; d.wasSeen=false; guidePlace(d,tg); } } },500);
+
+// ---------- low mist drifting along the ground, thickest outside the park ----------
+const mistTex=(()=>{ const c=document.createElement('canvas'); c.width=c.height=128; const g=c.getContext('2d');
+  const r=g.createRadialGradient(64,64,4,64,64,62); r.addColorStop(0,'rgba(190,200,210,.55)'); r.addColorStop(.5,'rgba(170,180,195,.22)'); r.addColorStop(1,'rgba(160,170,185,0)');
+  g.fillStyle=r; g.fillRect(0,0,128,128); return new THREE.CanvasTexture(c); })();
+const MIST=[];
+(()=>{ const spots=[];
+  for(let i=0;i<26;i++) spots.push([-30+Math.random()*60, 70+Math.random()*55]);          // parking lot / road to the car
+  for(let i=0;i<26;i++) spots.push([-110+Math.random()*220, -150-Math.random()*45]);      // the woods to the north
+  for(let i=0;i<22;i++){ const sd=Math.random()<0.5?-1:1; spots.push([sd*(112+Math.random()*25), -140+Math.random()*190]); }   // along the fences
+  for(let i=0;i<18;i++) spots.push([-100+Math.random()*200, -130+Math.random()*180]);     // a few wisps inside
+  spots.forEach(([x,z])=>{ const m=new THREE.Sprite(new THREE.SpriteMaterial({map:mistTex,transparent:true,depthWrite:false,opacity:0.16+Math.random()*0.14,color:0xb8c2cc}));
+    const sc=10+Math.random()*14; m.scale.set(sc,sc*0.35,1); m.position.set(x,0.8+Math.random()*1.2,z); m.userData={vx:(Math.random()-0.5)*0.5,vz:(Math.random()-0.5)*0.5,ph:Math.random()*6};
+    scene.add(m); MIST.push(m); }); })();
+setInterval(()=>{ if(paused) return; MIST.forEach(m=>{ m.position.x+=m.userData.vx*0.1; m.position.z+=m.userData.vz*0.1; m.material.rotation=Math.sin(tNow*0.1+m.userData.ph)*0.2; }); },100);
+
+// ---------- monsters scramble your camera as they get close ----------
+let FUZZ=0, fuzzHiss=null;
+setInterval(()=>{
+  if(!started) return;
+  let near=1e9;
+  if(!dead&&!ended&&!paused){
+    allMons().forEach(m=>{ if(m.active&&m.g.visible) near=Math.min(near,Math.hypot(m.g.position.x-player.pos.x,m.g.position.z-player.pos.z)); });
+    choirs.forEach(c=>{ if(c.active) near=Math.min(near,Math.hypot(c.g.position.x-player.pos.x,c.g.position.z-player.pos.z)); });
+    if(sexton.active&&sexton.g) near=Math.min(near,Math.hypot(sexton.g.position.x-player.pos.x,sexton.g.position.z-player.pos.z));
+    if(RESCUE) near=Math.min(near,4);
+  }
+  const want=clamp(1-(near-4)/22,0,1); FUZZ+=(want-FUZZ)*0.15; const a=FUZZ;
+  const cv=canvas; const base=camOn?'grayscale(1) sepia(.8) hue-rotate(55deg) saturate(1.7) brightness(1.45) contrast(1.12) ':'';
+  cv.style.filter=a>0.02?base+'blur('+(a*1.6).toFixed(2)+'px) contrast('+(1+a*0.35).toFixed(2)+')':'';
+  cv.style.transform=a>0.05?'translate('+((Math.random()-0.5)*a*7).toFixed(1)+'px,'+((Math.random()-0.5)*a*3).toFixed(1)+'px)':'';
+  $('grain').style.opacity=(camOn?0.22:0.06)+a*0.32;
+  $('glitch').style.opacity=a>0.25&&Math.random()<a*0.6?a:0;
+  if(AC&&master){ if(!fuzzHiss){ const n=AC.createBufferSource(); n.buffer=noiseBuf; n.loop=true; const bp=AC.createBiquadFilter(); bp.type='bandpass'; bp.frequency.value=3000; bp.Q.value=0.5;
+      const g=AC.createGain(); g.gain.value=0; n.connect(bp); bp.connect(g); g.connect(master); n.start(); fuzzHiss=g; }
+    fuzzHiss.gain.setTargetAtTime(a*a*0.09*(0.6+Math.random()*0.8),AC.currentTime,0.05); }
+},100);
 </script>
 </body>
 </html>
