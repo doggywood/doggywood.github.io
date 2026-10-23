@@ -50,7 +50,7 @@
 <div id="hud">
   <div id="order"></div>
   <div id="rec"><span class="dot">&#9679;</span> REC &nbsp;DOGGYWOOD INSPECTION CAM 02<br><span id="bat"></span></div>
-  <div id="clock"></div><div id="hp"></div>
+  <canvas id="mmap" width="300" height="300" style="position:absolute;right:16px;bottom:44px;width:150px;height:150px;border-radius:50%;opacity:.85"></canvas><div id="clock"></div><div id="hp"></div>
   <div id="cross"></div>
   <div id="bar"><i></i></div>
   <div id="prompt"></div>
@@ -59,7 +59,7 @@
 <div id="photo"><canvas id="pcanvas" width="320" height="180"></canvas></div>
 <div id="start">
   <h1>DOGGYWOOD</h1>
-  <p>You are a contract inspector. The park is for sale. Do the survey at night, quietly, and leave.</p>
+  <p>You are Liam, a field inspector for Solomon LLC. Doggywood Park closed fifteen years ago and is finally for sale. The sellers won't say much, and they want the inspection done tonight. Check that everything still works, document it, and leave.</p>
   <p><span class="k">WASD</span> move &nbsp; <span class="k">Mouse</span> look &nbsp; <span class="k">Shift</span> sprint (loud) &nbsp; <span class="k">C</span> crouch (quiet)<br>
      <span class="k">F</span> flashlight &nbsp; <span class="k">Q</span> body cam &nbsp; <span class="k">Scroll</span> zoom (cam on) &nbsp; <span class="k">Click</span> photo &nbsp; <span class="k">E</span> interact / hold</p>
   <p>Fog is light. Lit lamps show you the park, and its silhouettes. The dogs never touch you. They only move when you aren't looking. Wear headphones.</p>
@@ -1164,7 +1164,7 @@ const mons={};
 function initStatueMons(){
   mons.tyke=new StatueMon(makeTyke(),{speed:3.5,h:1.2,lightAverse:true,hurtOnly:true,msg:'Something with too many knuckles was behind you.',name:'tyke',
     tick:(m,dt,d,seen)=>{ if(!seen) m.g.userData.limbs.forEach((l,i)=>l.rotation.x=Math.sin(tNow*14+i*1.7)*0.5); }});
-  mons.tyke.g.position.set(0,1.45,112); mons.tyke.g.rotation.y=Math.PI; mons.tyke.g.visible=true; // crouched on the car roof
+  mons.tyke.g.position.set(0,1.45,112); mons.tyke.g.rotation.y=Math.PI; mons.tyke.g.visible=false; // hidden: the tall thing over the car is what you see at first
   mons.lifeguard=new StatueMon(makeLifeguard(),{speed:2.7,h:2.4,kill:1.5,noclipT:3,hurtOnly:true,msg:'The lifeguard held you under.',name:'lifeguard',
     tick:(m,dt)=>{ m.g.userData.drips.forEach(d=>{ d.position.y-=dt*1.6; if(d.position.y<0) d.position.y=rand(1.0,2.0); }); }});
   mons.mirror=new StatueMon(makeMirrorFolk(),{speed:2.9,h:3.4,kill:1.5,msg:'You looked away. It had stepped out of the glass.',name:'mirror'});
@@ -1297,7 +1297,8 @@ function say(text,secs){
   $('sub').textContent=text; noiseBurst(0.12,2400,0.12,1);
   clearTimeout(subTimer); subTimer=setTimeout(()=>{$('sub').textContent='';},(secs||4.5)*1000);
 }
-function dale(t,secs){ say('DALE: '+t,secs||5.5); }
+function dale(t,secs){ say('DALE: '+t,secs||5.5); playVoice('dale',t); }
+function liam(t,secs){ say('LIAM: '+t,secs||3.5); playVoice('liam',t); }
 
 // ---------- objectives HUD ----------
 function setOrder(){
@@ -1321,18 +1322,18 @@ function nearInteract(){
 
 // ---------- story ----------
 function boothDone(){
-  stage=1; setOrder(); WORLD.ticketLight.intensity=1.5; WORLD.ticketWin.material.color.set(0xffe7a0); blip(900,0.1,'square',0.1);
-  dale('Good. Lights are on. Now the survey: three photos for the buyer. Fountain, ferris wheel, coaster. Use the body cam.',7);
+  stage=1; setOrder(); later(0.5,checkpoint); later(8.5,()=>liam('Lights work. Photos, then I\'m out of here.')); WORLD.ticketLight.intensity=1.5; WORLD.ticketWin.material.color.set(0xffe7a0); blip(900,0.1,'square',0.1);
+  dale('Good. Lights work. Solomon wants three photos for the file: fountain, ferris wheel, coaster. Use the body cam.',7);
 }
 function photoTaken(t){
-  t.done=true; later(0.5,checkpoint); photosTaken++; setOrder(); shotWait=3;
+  t.done=true; if(photosTaken===0) later(0.8,()=>liam('One for the file.')); if(photosTaken===2) later(0.6,()=>liam('That\'s the last photo.')); photosTaken++; setOrder(); shotWait=3;
   if(photosTaken===1){
     later(4,()=>{ musicDuck(4); }); later(5,()=>{ const d=dogs[0]; d.active=true; placeDog(d,11,3.35,-52,{away:false}); });
-    later(7,()=>dale('Mm. You get a good shot? ...The park ran a dog theme. Don\'t let it bother you.',6));
+    later(7,()=>dale('Mm. You get a good shot? ...The park had a mascot. A dog. If you see one of the old suits, don\'t let it bother you.',6));
   } else if(photosTaken===2){
     later(3,kidsEvent);
   } else if(photosTaken===3){
-    stage=2; setOrder(); dogs[1].mode='guide'; dogs[1].active=true; activateDogs(2);
+    stage=2; setOrder(); later(0.5,checkpoint); dogs[1].mode='guide'; dogs[1].active=true; activateDogs(2);
     later(2,()=>dale('Perfect. Last thing: main breaker, service building, east side. I need power on before the buyer\'s walkthrough.',7));
   }
 }
@@ -1348,7 +1349,7 @@ function kidsEvent(){
   kidA.visible=kidB.visible=true; kidRun={t:0};
   speak('Yo yo yo, someone\'s over there!',1.5,0.9); setTimeout(()=>speak('Run! Go go go go!',1.0,0.9),2200); setTimeout(()=>speak('Hahahaha!',1.7,0.8),4000);
   later(11,()=>{ kidA.visible=kidB.visible=false; kidRun=null; scene.remove(kidA); scene.remove(kidB);
-    dale('Kids. They climb the fence every weekend. Ignore them.',5); });
+    dale('Urbex kids. They climb the fence every weekend to film their videos. Ignore them.',5); });
   later(16,()=>{ scream(V(-110,1.5,-90)); });
   later(19,()=>{ dale('...Did you hear that?',3); stage=1; });
 }
@@ -1357,13 +1358,13 @@ function activateDogs(n){
     const c=WORLD.dogSpots.filter(s=>Math.hypot(s.x-player.pos.x,s.z-player.pos.z)>30&&!seenPoint(_t.set(s.x,s.y+1.6,s.z))); if(c.length){ const s=pick(c); placeDog(d,s.x,s.y,s.z,{away:Math.random()<0.3}); } }
 }
 function powerOn(){
-  powered=true; later(0.5,checkpoint); lamps.forEach((l,i)=>{ if(l.camp||l.x===0&&l.z===108) return; setTimeout(()=>lampOn(l,1.5+Math.random()),i*60); });
+  powered=true; lamps.forEach((l,i)=>{ if(l.camp||l.x===0&&l.z===108) return; setTimeout(()=>lampOn(l,1.5+Math.random()),i*60); });
   WORLD.deco.forEach((l,i)=>setTimeout(()=>lampOn(l,1+Math.random()),400+i*25));
   WORLD.wheelBulbs.forEach(b=>b.material.opacity=0.9);
   setFog(0.0135); startMusicBox(WORLD.C.carousel.x,3,WORLD.C.carousel.z);
 }
 function breakerDone(){
-  stage=3; setOrder(); WORLD.breakerLamp.material.color.set(0x22ff44); blip(120,0.6,'sawtooth',0.3); stinger();
+  stage=3; setOrder(); later(0.5,checkpoint); later(3,()=>liam('Wait. Did the gate just close?')); WORLD.breakerLamp.material.color.set(0x22ff44); blip(120,0.6,'sawtooth',0.3); stinger();
   powerOn(); setMusic({distort:0.3,vol:0.5}); musicAt(60,6,-30);
   later(1.2,()=>{ WORLD.gateMeshL.visible=WORLD.gateMeshR.visible=true; WORLD.gateCol.active=true; noiseBurst(1.2,160,0.6,0.4); blip(70,0.9,'square',0.3); });
   later(2,()=>{ if(hymnG) hymnG.gain.linearRampToValueAtTime(0.11,AC.currentTime+8); });
@@ -1377,13 +1378,13 @@ function breakerDone(){
 }
 function revealBody(k){ const b=WORLD.bodies[k]; b.visible=true; if(b.userData.pool) b.userData.pool.visible=true; if(k==='jax'&&WORLD.jaxPool) WORLD.jaxPool.visible=true; }
 function sigilBroken(s){
-  s.broken=true; sigilsBroken++; later(0.5,checkpoint); s.mesh.visible=false; stinger(); setOrder();
+  s.broken=true; sigilsBroken++; s.mesh.visible=false; stinger(); setOrder();
   noiseBurst(1.5,120,0.7,0.3); blip(55,1.4,'sawtooth',0.3);
   killLamps(0.18); boxWarp=Math.min(1,sigilsBroken*0.3);
   setMusic({distort:Math.min(0.9,0.3+sigilsBroken*0.2)}); activateDogs(2); dogRate=Math.max(0.5,1-sigilsBroken*0.15);
-  if(s.id==='carousel'){ mons.horses.forEach(h=>h.despawn()); }
-  if(s.id==='fun'){ mons.mirror.despawn(); }
-  if(s.id==='pool'){ mons.lifeguard.despawn(); }
+  if(s.id==='carousel'){ mons.horses.forEach(h=>h.despawn()); later(1.2,()=>rideRescue('carousel',mons.horses[0],s)); }
+  if(s.id==='fun'){ mons.mirror.despawn(); later(1.2,()=>rideRescue('fun',mons.mirror,s)); }
+  if(s.id==='pool'){ mons.lifeguard.despawn(); later(1.2,()=>rideRescue('pool',mons.lifeguard,s)); }
   if(!sextonSpawned&&sigilsBroken>=1){ sextonSpawned=true; later(6,()=>{ spawnSexton(); say('You hear someone humming. It is not coming from the speakers.',5); }); }
   if(sigilsBroken===2&&!choir2Spawned){ choir2Spawned=true; later(5,()=>spawnChoir(choirs[1],30,45)); }
   if(sigilsBroken>=4){
@@ -1391,9 +1392,10 @@ function sigilBroken(s){
     lamps.filter(l=>l.camp).forEach(l=>lampOn(l,1));
     later(2,()=>{ say('Far to the north, something heavy swings open.',5); noiseBurst(1.5,140,0.7,0.4); });
     later(8,()=>dale('The north gate... Please. Please don\'t go through the maze.',5));
+    later(14.5,()=>liam('Why would the service gate open, and not the main one?'));
     if(hymnG) hymnG.gain.linearRampToValueAtTime(0.22,AC.currentTime+5);
   } else {
-    later(3,()=>{ if(sigilsBroken===1) dale('What did you do? What was that? Stop doing that.',5); else if(sigilsBroken===2) say('Static on the radio. Under it, someone laughing.',5); else say('Three interlocks reset. The music box has slowed.',4); });
+    later(3,()=>{ if(sigilsBroken===1){ dale('What did you do? What was that? Stop doing that.',5); later(8,()=>say('Under the paint, the panel is bolted onto carved stone. A grave marker. The park was built on top of a burial ground.',6)); later(15,()=>liam('Nobody said anything about graves.')); } else if(sigilsBroken===2) say('Static on the radio. Under it, someone laughing.',5); else say('Three interlocks reset. The music box has slowed.',4); });
   }
 }
 function killLamps(frac){ const on=lamps.filter(l=>l.on&&l.safe); on.sort(()=>Math.random()-0.5); on.slice(0,Math.ceil(on.length*frac)).forEach(l=>{ l.on=false; l.sp.material.opacity=0; l.bulb.material.color.set(0x15120c); l.safe=false; }); }
@@ -1404,10 +1406,13 @@ function endGame(){
   if(hymnG){ hymnG.gain.cancelScheduledValues(0); hymnG.gain.linearRampToValueAtTime(0.0,AC.currentTime+3); }
   if(choirVoice) choirVoice.gain.gain.value=0; if(sextonVoice) sextonVoice.gain.gain.value=0; stopMusicBox(); setMusic({vol:0});
   choirs.forEach(c=>c.g.visible=false); sexton.g.visible=false; Object.values(mons).flat().forEach(m=>{ if(m.despawn) m.despawn(); });
-  const c=WORLD.campSigil, n=dogs.length+1, counted=seenDogSet.size;
-  const ring=[]; for(let i=0;i<n;i++){ const d=i<dogs.length?dogs[i]:spawnDog(false); d.active=false; const a=i/n*TAU; placeDog(d,c.x+Math.cos(a)*9,0,c.z+Math.sin(a)*9,{keepOthers:true}); d.armR.rotation.set(0,0,-0.12); ring.push(d); }
+  const c=WORLD.campSigil, counted=seenDogSet.size;
+  dogs.forEach(d=>{ d.active=false; d.g.visible=false; });
+  const d=dogs[1]; const fx=-Math.sin(player.yaw), fz=-Math.cos(player.yaw);   // he stands just ahead of you, facing the Choir, his back to you
+  placeDog(d,player.pos.x+fx*2.6,0,player.pos.z+fz*2.6,{}); d.g.rotation.y=Math.atan2(fx,fz); d.head.rotation.set(0,0,0); d.armR.rotation.set(0,0,-0.12);
   later(2,()=>say('...',3));
-  later(8,()=>{ $('emsg').innerHTML='You saw '+counted+' dogs tonight.<br><br>There are '+n+' standing here.<br><br><span style="color:#777">DOGGYWOOD &mdash; vertical slice complete.<br>Tell me what scared you, what dragged, and what to build next.</span>'; $('end').style.display='flex'; try{document.exitPointerLock();}catch(e){} });
+  later(5,()=>say('The Choir does not come any closer.',4));
+  later(10,()=>{ $('emsg').innerHTML='You saw him '+Math.max(1,counted)+(counted===1?' time':' times')+' tonight.<br>It was always the same dog.<br>He was never hunting you.<br><br><span style="color:#9a8f7a">SOLOMON LLC &mdash; SITE INSPECTION: DOGGYWOOD PARK<br>Inspector: Liam &nbsp;&middot;&nbsp; Recommendation: DO NOT PURCHASE</span>'; $('end').style.display='flex'; try{document.exitPointerLock();}catch(e){} });
 }
 
 // ---------- photo ----------
@@ -1460,9 +1465,9 @@ $('start').addEventListener('click',()=>{
   try{ const d=document.documentElement, f=d.requestFullscreen||d.webkitRequestFullscreen; if(f&&!document.fullscreenElement){ const r=f.call(d); if(r&&r.catch) r.catch(()=>{}); } }catch(e){}
   try{ navigator.gamepadInputEmulation='gamepad'; }catch(e){}
   try{ const r=canvas.requestPointerLock(); if(r&&r.catch) r.catch(()=>{}); }catch(e){}
-  $('start').style.display='none'; started=true; setOrder(); startScore(); later(1,checkpoint);
+  $('start').style.display='none'; started=true; setOrder(); startScore(); later(1,checkpoint); later(1.6,()=>liam('Okay. Doggywood Park. In and out.'));
   if(WORLD.car) musicAt(WORLD.car.position.x,1,WORLD.car.position.z);
-  later(5,()=>dale('You in? Gate\'s open. Plaza is straight ahead. Booth first.',6));
+  later(5,()=>dale('Liam? You in? Gate\'s open. Plaza\'s straight ahead. Start with the ticket booth.',6));
 });
 document.addEventListener('pointerlockchange',()=>{locked=document.pointerLockElement===canvas;});
 addEventListener('mousemove',e=>{
@@ -1608,7 +1613,7 @@ function update(dt){
   revealBodies();
   // --- world animation ---
   if(powered&&WORLD.wheel){ WORLD.wheel.rotation.z+=dt*0.07; WORLD.wheel.children.forEach(c=>{ if(c.userData&&c.userData.cab) c.rotation.z=-WORLD.wheel.rotation.z; }); }
-  if(powered&&!seenPoint(_t.set(WORLD.C.carousel.x,3,WORLD.C.carousel.z))) WORLD.carousel.rotation.y+=dt*0.4;
+  if(powered&&!seenPoint(_t.set(WORLD.C.carousel.x,3,WORLD.C.carousel.z))) WORLD.carousel.rotation.y+=dt*(0.4+rideSpin);
   WORLD.towerLight.material.opacity=Math.sin(tNow*2)>0.55?1:0.06;
   if(kidRun){ kidRun.t+=dt; const q=Math.min(1,kidRun.t/9);
     kidA.position.set(-70+130*q,Math.abs(Math.sin(kidRun.t*11))*0.08,30-12*q); kidB.position.set(-74+130*Math.min(1,Math.max(0,(kidRun.t-0.9)/9)),Math.abs(Math.sin(kidRun.t*11+1))*0.08,32-12*q);
@@ -1738,7 +1743,7 @@ function respawn(){
   choirs.forEach(c=>{ if(c.active&&Math.hypot(c.g.position.x-player.pos.x,c.g.position.z-player.pos.z)<30){ c.state='patrol'; const w=CHOIR_WP[c.set][Math.floor(Math.random()*CHOIR_WP[c.set].length)]; c.g.position.set(w[0],0,w[1]); } });
   if(sexton.active) spawnSexton();
   try{ const r=canvas.requestPointerLock(); if(r&&r.catch) r.catch(()=>{}); }catch(e){}
-  say('...',1.5);
+  liam('Okay. Breathe.',2.5);
 }
 let rumT=18;
 setInterval(()=>{
@@ -1763,6 +1768,89 @@ const boothDog=(()=>{ const m=makeDog(false); const g=m.g; g.position.set(-9.1,0
   m.head.rotation.set(0.5,0.4,0.7); if(m.armR) m.armR.rotation.set(0.2,0,-0.5); return {g,away:0}; })();
 setInterval(()=>{ if(!boothDog.g.visible||stage<1) return;
   if(seenPoint(_t.set(boothDog.g.position.x,1,boothDog.g.position.z))) boothDog.away=0; else if((boothDog.away+=0.25)>2.5) boothDog.g.visible=false; },250);
+
+// ---------- mini map: turns with you. Buildings and walls, and where the job is. Never the monsters ----------
+const MM=$('mmap'), mm=MM.getContext('2d');
+setInterval(()=>{
+  MM.style.display=(started&&!ended)?'block':'none'; if(!started||ended) return;
+  const W=300, R=150, sc=R/55, px=player.pos.x, pz=player.pos.z, cy=Math.cos(player.yaw), sy=Math.sin(player.yaw);
+  const toS=(x,z)=>{ const dx=x-px, dz=z-pz; return [R+(dx*cy-dz*sy)*sc, R-(-dx*sy-dz*cy)*sc]; };
+  mm.clearRect(0,0,W,W); mm.save(); mm.beginPath(); mm.arc(R,R,R-2,0,TAU); mm.clip();
+  mm.fillStyle='rgba(6,10,8,.82)'; mm.fillRect(0,0,W,W);
+  mm.fillStyle='rgba(160,190,165,.55)';
+  for(const c of colliders){ if(!c.active) continue; if(Math.max(c.minX-px,px-c.maxX,c.minZ-pz,pz-c.maxZ)>60) continue;
+    const pts=[toS(c.minX,c.minZ),toS(c.maxX,c.minZ),toS(c.maxX,c.maxZ),toS(c.minX,c.maxZ)]; mm.beginPath(); pts.forEach((q,k)=>k?mm.lineTo(q[0],q[1]):mm.moveTo(q[0],q[1])); mm.closePath(); mm.fill(); }
+  // objective marker (stays on the rim when it's far)
+  let tg=null; try{ tg=stage===0?V(-9,0,52):stage===1?(photoTargets.find(t=>!t.done)||{}).pos:guideTarget(); }catch(e){}
+  if(tg){ let [x,y]=toS(tg.x,tg.z); const dx=x-R, dy=y-R, dd=Math.hypot(dx,dy); if(dd>R-14){ x=R+dx/dd*(R-14); y=R+dy/dd*(R-14); }
+    mm.fillStyle='#ffd35a'; mm.beginPath(); mm.arc(x,y,9,0,TAU); mm.fill(); }
+  mm.restore();
+  mm.strokeStyle='rgba(200,230,205,.6)'; mm.lineWidth=4; mm.beginPath(); mm.arc(R,R,R-2,0,TAU); mm.stroke();
+  mm.fillStyle='#e8f5ea'; mm.beginPath(); mm.moveTo(R,R-14); mm.lineTo(R+9,R+10); mm.lineTo(R,R+5); mm.lineTo(R-9,R+10); mm.closePath(); mm.fill();
+},100);
+
+// ---------- voices: pre-recorded natural voices; Dale comes through a walkie-talkie ----------
+let VOX={}; fetch('voice/lines.json').then(r=>r.ok?r.json():{}).then(j=>{VOX=j;}).catch(()=>{});
+const voxCache={}; let voxSrc=null;
+function playVoice(who,text){
+  if(!AC) return; const fn=VOX[who+'|'+text]; if(!fn) return;
+  const go=buf=>{ try{ if(voxSrc) voxSrc.stop(); }catch(e){}
+    const src=AC.createBufferSource(); src.buffer=buf; let node=src;
+    const g=AC.createGain(); g.gain.value=who==='dale'?1.5:1.0;
+    if(who==='dale'){ const hp=AC.createBiquadFilter(); hp.type='highpass'; hp.frequency.value=380; const lp=AC.createBiquadFilter(); lp.type='lowpass'; lp.frequency.value=3200;
+      const ws=AC.createWaveShaper(); const c=new Float32Array(256); for(let i=0;i<256;i++){ const x=i/128-1; c[i]=Math.tanh(x*2.2); } ws.curve=c;
+      node.connect(hp); hp.connect(lp); lp.connect(ws); node=ws; noiseBurst(0.12,2400,0.12,1); setTimeout(()=>noiseBurst(0.1,2400,0.1,1),buf.duration*1000+80); }
+    node.connect(g); g.connect(master); src.start(); voxSrc=src; };
+  if(voxCache[fn]) go(voxCache[fn]);
+  else fetch('voice/'+fn).then(r=>r.arrayBuffer()).then(b=>AC.decodeAudioData(b)).then(buf=>{ voxCache[fn]=buf; go(buf); }).catch(()=>{});
+}
+// ---------- the thing standing over your car ----------
+const carWatcher=(()=>{ const g=new THREE.Group(), skin=lam({color:0xcfc8ba}), dark=lam({color:0x4a443d});
+  [-0.22,0.22].forEach(x=>mesh(CG(0.06,0.1,2.6,6),dark,x,1.3,0,g));
+  const spine=new THREE.Group(); spine.position.y=2.6; spine.rotation.x=1.05; g.add(spine);
+  mesh(CG(0.15,0.26,1.7,7),dark,0,0.85,0,spine); mesh(BG(0.95,0.16,0.22),dark,0,1.65,0,spine);
+  const head=new THREE.Group(); head.position.y=1.95; head.rotation.x=0.55; spine.add(head);
+  mesh(SG(0.21,8,6),skin,0,0,0,head).scale.set(0.85,1.45,0.9);
+  [-0.08,0.08].forEach(x=>mesh(SG(0.05,5,4),bas({color:0x000000}),x,0.05,0.17,head));
+  mesh(BG(0.22,0.03,0.03),bas({color:0x050505}),0,-0.16,0.17,head);
+  [-1,1].forEach(sd=>{ const a=new THREE.Group(); a.position.set(sd*0.47,1.6,0); a.rotation.x=-1.05-0.25; a.rotation.z=sd*0.08; spine.add(a);
+    mesh(CG(0.05,0.045,2.5,5),skin,0,-1.25,0,a); for(let f=0;f<4;f++) mesh(CG(0.012,0.008,0.5,3),skin,(f-1.5)*0.035,-2.7,0.02,a); });
+  g.scale.setScalar(1.3); g.position.set(-1.7,0,112.4); g.rotation.y=Math.PI/2; scene.add(g);
+  const glow=new THREE.PointLight(0xcfd8ff,0.9,9,2); glow.position.set(1.2,4.2,112.4); scene.add(glow);   // a cold light catches it
+  g.userData.glow=glow; return g; })();
+let watcherSeen=false;
+setInterval(()=>{ if(!started||!carWatcher.visible) return;
+  if(!watcherSeen&&seenObj(carWatcher.position,4)){ watcherSeen=true; later(0.8,()=>liam('...What is that.',2.5)); }
+  if(stage>=3&&tNow>0&&mons.tyke.active){ carWatcher.visible=false; carWatcher.userData.glow.intensity=0; } },250);
+
+// ---------- the dog saves you, using the ride you just fixed ----------
+let rideSpin=0, RESCUE=null;
+/* lines recorded by tools/make-voices.py: liam('Did the dog just... save me?') liam('...Good boy?') liam('He\'s helping me.') */
+const RESCUE_LINES={carousel:'Did the dog just... save me?', pool:'...Good boy?', fun:'He\'s helping me.'};
+function rideRescue(kind,m,sig){
+  if(dead||ended||!m) return;
+  // it pops out to your side, close
+  const side=Math.random()<0.5?1:-1, rx=Math.cos(player.yaw)*side, rz=-Math.sin(player.yaw)*side, fx=-Math.sin(player.yaw), fz=-Math.cos(player.yaw);
+  m.despawn(); const g=m.g; g.visible=true; g.scale.setScalar(1);
+  g.position.set(player.pos.x+rx*4.5+fx*2.5,0,player.pos.z+rz*4.5+fz*2.5); g.rotation.y=Math.atan2(player.pos.x-g.position.x,player.pos.z-g.position.z);
+  player.hurtT=9; stinger(1.1); thump(0.8);
+  RESCUE={kind,m,t:0,start:g.position.clone(),sig,dogPlaced:false};
+}
+setInterval(()=>{
+  rideSpin=Math.max(0,rideSpin-0.05*6);
+  const R=RESCUE; if(!R) return; const dt=0.05; R.t+=dt; const g=R.m.g, p=g.position;
+  if(dead||ended){ g.visible=false; RESCUE=null; return; }
+  if(R.t<0.9){ const tx=player.pos.x, tz=player.pos.z, d=Math.hypot(tx-p.x,tz-p.z); if(d>2.2){ p.x+=(tx-p.x)/d*dt*5; p.z+=(tz-p.z)/d*dt*5; } g.rotation.y=Math.atan2(tx-p.x,tz-p.z); return; }   // lunging at you
+  if(!R.dogPlaced){ R.dogPlaced=true; const d=dogs[1]; placeDog(d,R.sig.x+2,0,R.sig.z+2,{point:V(p.x,0,p.z)}); }
+  if(R.kind==='carousel'){ rideSpin=14; const c=WORLD.C.carousel, a=Math.atan2(p.z-c.z,p.x-c.x)+dt*3, r=Math.hypot(p.x-c.x,p.z-c.z);   // the carousel whips up and flings it off
+    if(R.t<1.6){ const rr=Math.max(5.5,r-dt*14); p.x=c.x+Math.cos(a)*rr; p.z=c.z+Math.sin(a)*rr; noiseBurst(0.06,900,0.12,1); }
+    else { p.x+=Math.cos(a)*dt*26; p.z+=Math.sin(a)*dt*26; p.y+=dt*(9-(R.t-1.6)*14); g.rotation.x+=dt*9; if(R.t>1.62&&R.t<1.68){ thump(1); noiseBurst(0.5,300,0.5,0.5,{x:p.x,y:1,z:p.z}); } } }
+  else if(R.kind==='pool'){ const c=WORLD.C.pool; if(R.t<1.0) noiseBurst(0.15,700,0.25,0.6);   // the pump kicks on and drags it under
+    const d=Math.hypot(c.x-p.x,c.z-p.z)||1; p.x+=(c.x-p.x)/d*dt*Math.min(d,14); p.z+=(c.z-p.z)/d*dt*Math.min(d,14); if(d<6) p.y-=dt*2.2; g.rotation.z=Math.sin(R.t*20)*0.2; }
+  else if(R.kind==='fun'){ if(R.t<1.0){ const f=$('flashfx'); f.style.opacity=0.85; setTimeout(()=>{f.style.opacity=0;},90); for(let k=0;k<3;k++) noiseBurst(0.2,3600+k*800,0.3,2); }   // the lights blaze on and it shatters
+    g.scale.setScalar(Math.max(0.01,1-(R.t-0.9)*0.9)); g.rotation.y+=dt*8; }
+  if(R.t>2.8){ g.visible=false; g.scale.setScalar(1); g.rotation.x=0; g.rotation.z=0; R.m.despawn(); const k=R.kind; RESCUE=null; later(0.4,()=>liam(RESCUE_LINES[k])); }
+},50);
 </script>
 </body>
 </html>
