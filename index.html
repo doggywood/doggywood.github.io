@@ -58,7 +58,7 @@
 <div id="camlines"></div>
 <canvas id="grain" width="640" height="360"></canvas>
 <div id="scan"></div><div id="vig"></div><div id="glitch"></div>
-<div id="hurt"></div><div id="flashfx"></div>
+<div id="hurt"></div><div id="flashfx"></div><div id="fade" style="position:fixed;inset:0;background:#000;opacity:0;pointer-events:none;transition:opacity .9s;z-index:8"></div><div id="titlecard" style="position:fixed;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;pointer-events:none;z-index:9;opacity:0;transition:opacity 1.2s"><div id="tc1" style="font-size:64px;letter-spacing:.5em;color:#e8e0c8;text-shadow:0 0 18px rgba(0,0,0,.9),3px 0 0 rgba(255,0,60,.35),-3px 0 0 rgba(0,200,255,.35)">DOGGYWOOD</div><div id="tc2" style="margin-top:18px;font-size:18px;letter-spacing:.35em;color:#cfc6ae;text-shadow:0 0 10px #000"></div></div><div id="skiphint" style="position:fixed;right:20px;bottom:16px;color:#9a9;font-size:13px;display:none;z-index:7"></div>
 <div id="hud">
   <div id="order"></div>
   <div id="rec"><span class="dot">&#9679;</span> REC &nbsp;DOGGYWOOD INSPECTION CAM 02<br><span id="bat"></span></div>
@@ -74,7 +74,7 @@
   <p>You are Liam, a field inspector for Solomon LLC. Doggywood Park closed fifteen years ago and is finally for sale. The sellers won't say much, and they want the inspection done tonight. Check that everything still works, document it, and leave.</p>
   <p><span class="k">WASD</span> move &nbsp; <span class="k">Mouse</span> look &nbsp; <span class="k">Shift</span> sprint (loud) &nbsp; <span class="k">C</span> crouch (quiet)<br>
      <span class="k">F</span> flashlight &nbsp; <span class="k">Q</span> body cam &nbsp; <span class="k">Scroll</span> zoom (cam on) &nbsp; <span class="k">Click</span> photo &nbsp; <span class="k">E</span> interact / hold</p>
-  <p>Fog is light. Lit lamps show you the park, and its silhouettes. The dogs never touch you. They only move when you aren't looking. Wear headphones.</p>
+  <p>Fog is light. Lit lamps show you the park, and its silhouettes. The dog never touches you. Some things here only move when you aren't looking. Wear headphones.</p>
   <p id="padnote" style="display:none;color:#ffd35a">CONTROLLER: Left stick move &nbsp; Right stick look &nbsp; A interact (hold) &nbsp; X flashlight &nbsp; Y body cam &nbsp; RT photo &nbsp; LB sprint &nbsp; B crouch &nbsp; D-pad zoom &nbsp; &mdash; press A to begin</p>
   <p id="musicnote" style="color:#6a7"></p>
   <p style="margin-top:22px;color:#fff">[ click to begin ]</p>
@@ -1363,6 +1363,8 @@ function setOrder(){
 // ---------- interactables ----------
 function nearInteract(){
   const px=player.pos.x, pz=player.pos.z, S=WORLD.C.service;
+  if(INTRO.phase==='trunk'&&Math.hypot(px-WORLD.car.position.x,pz-(WORLD.car.position.z+2.6))<2.6) return {label:'Grab your gear from the trunk',fn:grabGear};
+  if(INTRO.phase==='trunk') return null;
   if(stage===0&&Math.hypot(px+9,pz-52)<2.8) return {label:'Check booth lighting',fn:boothDone};
   if(stage===2&&Math.hypot(px-(S.x+2.4),pz-S.z)<2.4) return {label:'Restore main breaker',fn:breakerDone};
   for(const t of tickets) if(!t.got&&Math.hypot(px-t.x,pz-t.z)<2.2) return {label:'Take ticket',fn:()=>{t.got=true;player.tickets++;blip(1200,0.1,'square',0.1);say('A paper ticket. ADMIT ONE. It is warm.',3);}};
@@ -1520,9 +1522,8 @@ $('start').addEventListener('click',()=>{
   try{ const d=document.documentElement, f=d.requestFullscreen||d.webkitRequestFullscreen; if(f&&!document.fullscreenElement){ const r=f.call(d); if(r&&r.catch) r.catch(()=>{}); } }catch(e){}
   try{ navigator.gamepadInputEmulation='gamepad'; }catch(e){}
   try{ const r=canvas.requestPointerLock(); if(r&&r.catch) r.catch(()=>{}); }catch(e){}
-  $('start').style.display='none'; started=true; setOrder(); startScore(); later(1,checkpoint); later(1.6,()=>liam('Okay. Doggywood Park. In and out.'));
+  $('start').style.display='none'; started=true; setOrder(); startScore(); startIntro();
   if(WORLD.car) musicAt(WORLD.car.position.x,1,WORLD.car.position.z);
-  later(5,()=>dale('Liam? You in? Gate\'s open. Plaza\'s straight ahead. Start with the ticket booth.',6));
 });
 document.addEventListener('pointerlockchange',()=>{locked=document.pointerLockElement===canvas;});
 addEventListener('mousemove',e=>{
@@ -1596,6 +1597,7 @@ function update(dt){
   tNow+=dt;
   for(let i=events.length-1;i>=0;i--){ if(tNow>=events[i].t){ const f=events[i].fn; events.splice(i,1); f(); } }
   if(!started){ return; }
+  if(INTRO.phase==='drive'||INTRO.phase==='fade'||INTRO.phase==='wait'){ introDrive(dt); return; }
   player.hurtT=Math.max(0,player.hurtT-dt);
   // --- movement ---
   if(!ended&&!dead&&player.stun<=0){
@@ -1804,7 +1806,7 @@ function respawn(){
 }
 let rumT=18;
 setInterval(()=>{
-  if(!started||dead||ended||paused) return;
+  if(!started||dead||ended||paused||INTRO.phase!=='done') return;
   // health comes back slowly if you stay out of trouble; the red edge shows how hurt you are
   if(player.hp<3&&tNow-(player.lastHit||0)>12){ player.hp++; player.lastHit=tNow; }
   const h=$('hurt'); if(!(player.flashT>0)) h.style.opacity=player.hp>=3?0:(3-player.hp)*0.28;
@@ -1829,7 +1831,7 @@ setInterval(()=>{ if(!boothDog.g.visible||stage<1) return;
 // ---------- mini map: turns with you. Buildings and walls, and where the job is. Never the monsters ----------
 const MM=$('mmap'), mm=MM.getContext('2d');
 setInterval(()=>{
-  MM.style.display=(started&&!ended)?'block':'none'; if(!started||ended) return;
+  MM.style.display=(started&&!ended&&INTRO.phase==='done')?'block':'none'; if(!started||ended||INTRO.phase!=='done') return;
   const W=300, R=150, sc=R/55, px=player.pos.x, pz=player.pos.z, cy=Math.cos(player.yaw), sy=Math.sin(player.yaw);
   const toS=(x,z)=>{ const dx=x-px, dz=z-pz; return [R+(dx*cy-dz*sy)*sc, R-(-dx*sy-dz*cy)*sc]; };
   mm.clearRect(0,0,W,W); mm.save(); mm.beginPath(); mm.arc(R,R,R-2,0,TAU); mm.clip();
@@ -2100,6 +2102,138 @@ setInterval(()=>{
 // creatures twitch while you watch: a sudden jerk of the whole body, then stillness again
 setInterval(()=>{ if(!started||paused||dead) return; allMons().forEach(m=>{ if(!m.active||!m.g.visible||!m.frozen) return;
   if(Math.random()<0.06){ const r0=m.g.rotation.z; m.g.rotation.z=r0+(Math.random()-0.5)*0.35; setTimeout(()=>{ m.g.rotation.z=r0; },90+Math.random()*120); } }); },200);
+
+// =====================================================================
+// OPENING: the drive in. First person behind the wheel, constant speed, guardrails you can't crash through.
+// Dale explains the job over the phone; you park, get out, and grab your gear from the trunk.
+// =====================================================================
+const INTRO={phase:'off',z:1160,x:0,vx:0,speed:14,t:0,shake:0,bumpT:-9,skip:0};
+// ---- the road in ----
+(()=>{ const asphalt=lam({color:0x34363b}), paint=bas({color:0xd8d0a8}), rail=lam({color:0x7d8287}), post=lam({color:0x3d3f42});
+  const road=new THREE.Mesh(new THREE.PlaneGeometry(9.5,1120),asphalt); road.rotation.x=-Math.PI/2; road.position.set(0,0.015,670); scene.add(road);
+  for(let z=125;z<1230;z+=9) mesh(BG(0.14,0.01,3.2),paint,0,0.03,z,scene);
+  [-1,1].forEach(sd=>{ mesh(BG(0.12,0.01,1100),paint,sd*4.35,0.03,670,scene);
+    for(let z=150;z<1230;z+=24){ mesh(BG(0.12,0.32,24),rail,sd*5.0,0.62,z+12,scene); mesh(BG(0.14,0.7,0.14),post,sd*5.0,0.35,z,scene); } });
+  // trees along the road
+  const N=640, cones=new THREE.InstancedMesh(new THREE.ConeGeometry(2.6,11,6),M.tree,N), trunks=new THREE.InstancedMesh(new THREE.CylinderGeometry(0.3,0.45,3,5),M.trunk,N);
+  const m=new THREE.Matrix4(), q=new THREE.Quaternion(); let n=0;
+  while(n<N){ const sd=Math.random()<0.5?-1:1, x=sd*(8+Math.pow(Math.random(),1.6)*60), z=225+Math.random()*1000, sc=0.8+Math.random()*0.8;
+    m.compose(V(x,6*sc,z),q,V(sc,sc,sc)); cones.setMatrixAt(n,m); m.compose(V(x,1.5,z),q,V(1,1,1)); trunks.setMatrixAt(n,m); n++; }
+  scene.add(cones,trunks);
+  // old road signs counting down to the park
+  const sign=(z,x,lines,big)=>{ const c=document.createElement('canvas'); c.width=512; c.height=256; const g=c.getContext('2d');
+    g.fillStyle='#2f4a35'; g.fillRect(0,0,512,256); g.strokeStyle='#d8d2bc'; g.lineWidth=10; g.strokeRect(12,12,488,232);
+    g.fillStyle='#e6dfc8'; g.textAlign='center'; lines.forEach((t,k)=>{ g.font=(k===0?'bold 64px':'44px')+' Courier New'; g.fillText(t,256,96+k*78); });
+    for(let k=0;k<1400;k++){ g.fillStyle='rgba(0,0,0,'+(Math.random()*0.35)+')'; g.fillRect(Math.random()*512,Math.random()*256,2+Math.random()*6,2+Math.random()*4); }   // weathering
+    const tex=new THREE.CanvasTexture(c); const w=big?6:4.4;
+    const b=new THREE.Mesh(new THREE.PlaneGeometry(w,w/2),lam({map:tex})); b.position.set(x,2.6,z); b.rotation.y=0; scene.add(b);
+    [-0.4,0.4].forEach(o=>mesh(BG(0.12,2.6,0.12),post,x+o*w,1.3,z+0.05,scene)); };
+  sign(900,-6.8,['DOGGYWOOD PARK','3 MILES']); sign(560,6.8,['DOGGYWOOD','1 MILE','FAMILY FUN!']); sign(330,-6.8,['DOGGYWOOD PARK','NEXT RIGHT']); sign(205,6.8,['PARK CLOSED','NO TRESPASSING'],true);
+  // a faded billboard of the mascot, grinning down at the road
+  const c=document.createElement('canvas'); c.width=512; c.height=256; const g=c.getContext('2d');
+  g.fillStyle='#d8c9a2'; g.fillRect(0,0,512,256); g.fillStyle='#c79a5c'; g.beginPath(); g.arc(120,130,82,0,7); g.fill();
+  g.fillStyle='#8f5c2e'; g.fillRect(36,70,40,110); g.fillRect(164,70,40,110); g.fillStyle='#000'; g.beginPath(); g.arc(92,112,16,0,7); g.arc(148,112,12,0,7); g.fill();
+  g.fillStyle='#e6d2a6'; g.beginPath(); g.ellipse(120,160,40,26,0,0,7); g.fill(); g.fillStyle='#000'; g.beginPath(); g.arc(120,146,10,0,7); g.fill();
+  g.strokeStyle='#000'; g.lineWidth=4; g.beginPath(); g.arc(120,166,26,0.2,Math.PI-0.2); g.stroke();
+  g.fillStyle='#7a1414'; g.font='bold 54px Courier New'; g.textAlign='left'; g.fillText('DOGGYWOOD',220,110); g.fillStyle='#3a2a1a'; g.font='30px Courier New'; g.fillText('Where every dog',224,160); g.fillText('has its day!',224,196);
+  for(let k=0;k<3000;k++){ g.fillStyle='rgba(20,15,10,'+(Math.random()*0.4)+')'; g.fillRect(Math.random()*512,Math.random()*256,1+Math.random()*5,1+Math.random()*3); }
+  const bb=new THREE.Mesh(new THREE.PlaneGeometry(12,6),lam({map:new THREE.CanvasTexture(c)})); bb.position.set(-12,6.5,450); scene.add(bb);
+  [-4,4].forEach(o=>mesh(BG(0.25,5,0.25),post,-12+o,2.5,450.1,scene));
+})();
+// ---- inside the car: dashboard, wheel, pillars, headlights, trunk lid ----
+const CAB={};
+function buildCab(){
+  const car=WORLD.car, dash=lam({color:0x111215}), trim=lam({color:0x1d1f23});
+  const cab=new THREE.Group(); car.add(cab); CAB.g=cab;
+  mesh(BG(1.86,0.34,0.55),dash,0,0.98,0.95,cab);                           // dashboard
+  mesh(BG(1.7,0.05,0.5),trim,0,1.16,0.98,cab);
+  const wheel=new THREE.Group(); wheel.position.set(0.4,1.13,0.6); wheel.rotation.x=-0.45; cab.add(wheel); CAB.wheel=wheel;
+  mesh(new THREE.TorusGeometry(0.19,0.025,6,16),trim,0,0,0,wheel); mesh(BG(0.36,0.035,0.03),trim,0,0,0,wheel); mesh(BG(0.035,0.19,0.03),trim,0,-0.09,0,wheel);
+  [-1,1].forEach(sd=>{ const a=new THREE.Mesh(BG(0.07,0.85,0.08),trim); a.position.set(sd*0.82,1.48,0.66); a.rotation.set(0.62,0,sd*-0.12); cab.add(a); });   // A-pillars
+  mesh(BG(1.7,0.06,0.12),trim,0,1.8,0.32,cab);                             // top of the windshield
+  mesh(BG(1.7,0.04,1.5),lam({color:0x16171a}),0,1.83,-0.45,cab);            // roof lining
+  mesh(BG(0.24,0.07,0.03),bas({color:0x2a2c30}),0,1.7,0.36,cab);            // rear-view mirror
+  [-0.08,0.08].forEach(o=>mesh(new THREE.CircleGeometry(0.06,12),bas({color:0xffa640}),0.4+o,1.05,0.672,cab,0,Math.PI,0));   // gauges
+  const rc=document.createElement('canvas'); rc.width=128; rc.height=32; const rg=rc.getContext('2d'); rg.fillStyle='#04120a'; rg.fillRect(0,0,128,32); rg.fillStyle='#6dff9a'; rg.font='bold 16px Courier New'; rg.fillText('FM 93.7  NIGHTCALL',4,21);
+  mesh(new THREE.PlaneGeometry(0.3,0.075),bas({map:new THREE.CanvasTexture(rc)}),0,0.96,0.672,cab,0,Math.PI,0);   // radio display
+  const dl=new THREE.PointLight(0x9fb8a0,0.9,2.6,2); dl.position.set(0.25,1.25,0.45); cab.add(dl);   // dim glow off the dash
+  const hl=new THREE.SpotLight(0xfff2d8,7,90,0.5,0.55,1); hl.position.set(0,0.8,2.4); const tg=new THREE.Object3D(); tg.position.set(0,0,30); car.add(hl,tg); hl.target=tg; CAB.hl=hl;
+  const hole=mesh(BG(1.6,0.01,0.8),bas({color:0x050506}),0,1.156,-1.75,car); hole.visible=false; CAB.hole=hole;   // the open trunk
+  const bag=mesh(BG(0.6,0.16,0.4),lam({color:0x4a3f2c}),0.1,1.2,-1.75,car); bag.visible=false; CAB.bag=bag;   // your gear bag
+  const lid=new THREE.Group(); lid.position.set(0,1.18,-1.32); car.add(lid); CAB.lid=lid; mesh(BG(1.9,0.06,0.92),lam({color:0x2e3a44}),0,0.03,-0.46,lid); mesh(BG(1.7,0.02,0.85),lam({color:0x121416}),0,-0.01,-0.46,lid);
+}
+function startIntro(){
+  if(!CAB.g) buildCab();
+  INTRO.phase='wait'; INTRO.waitT=0; INTRO.z=1160; $('fade').style.transition='none'; $('fade').style.opacity=1; INTRO.x=0; INTRO.vx=0; INTRO.speed=14; INTRO.t=0; INTRO.skip=0;
+  WORLD.car.rotation.y=Math.PI; player.yaw=0; player.pitch=-0.07; flashOn=false;
+  $('order').style.display='none';
+}
+function introGo(){
+  const I=INTRO; I.phase='drive'; I.t=0; I.cues=[]; I.songStart=null;
+  const at=(t,fn)=>I.cues.push([t,fn]);
+  if(music.buffers.length){ try{ if(music.src){ music.src.onended=null; music.src.stop(); } }catch(e){} music.idx=0; music.vol=0.42; playNextTrack(); I.songStart=AC.currentTime; }
+  $('fade').style.transition='opacity 1.6s'; setTimeout(()=>{ $('fade').style.opacity=0; },50);
+  const tc=$('titlecard'), t2=$('tc2');
+  at(1.0,()=>{ if(I.phase==='drive'){ $('tc1').style.display=''; t2.textContent=''; tc.style.opacity=1; } });
+  at(4.4,()=>{ tc.style.opacity=0; });
+  at(5.6,()=>{ if(I.phase==='drive'){ $('tc1').style.display='none'; t2.textContent='A  SAM  AND  OWEN  PRODUCTION'; tc.style.opacity=1; } });
+  at(9.4,()=>{ tc.style.opacity=0; });
+  at(15.8,()=>{ if(I.phase==='drive'){ music.vol=0.26; applyMusic(); } });   // radio down a little, the call comes in
+  // the call
+  const L=(t,fn)=>at(t,()=>{ if(INTRO.phase==='drive') fn(); });
+  L(15.8,()=>dale('Liam, it\'s Dale. I handle things for the sellers. You on your way?',7.5));
+  L(24.0,()=>liam('Almost there. Solomon sent me the file.',3));
+  L(27.3,()=>dale('Doggywood Park. Closed fifteen years ago. My clients are finally ready to sell, and the buyer wants an inspection before he signs.',10.8));
+  L(38.8,()=>liam('Why at night?',1.6));
+  L(40.4,()=>dale('My clients like it quiet. Kids climb the fence during the day to film their videos. Night\'s cleaner.',8.8));
+  L(49.9,()=>dale('The checklist is simple. Lights at the ticket booth. Three photos for the buyer\'s file. Then the main breaker, so everything\'s running for the walkthrough.',12.4));
+  L(63.0,()=>liam('And if something doesn\'t work?',2.2));
+  L(65.5,()=>dale('Then you write it down. That\'s the job. In and out.',6.4));
+  L(72.6,()=>liam('In and out.',2.2));
+  L(75.2,()=>liam('...There it is.',2.2));
+}
+function introDrive(dt){
+  const I=INTRO;
+  if(I.phase==='wait'){ I.waitT+=dt; if(music.buffers.length||I.waitT>6) introGo(); }
+  else { I.t=((AC&&I.songStart!=null)?AC.currentTime-I.songStart:I.t+dt-(I.toff||0))+(I.toff||0); if(I.cues){ I.cues.sort((x,y)=>x[0]-y[0]); while(I.cues.length&&I.t>=I.cues[0][0]) I.cues.shift()[1](); } }   // timed to the song itself
+  if(I.phase==='drive'){
+    const steer=clamp((keys.KeyD?1:0)-(keys.KeyA?1:0)+pad.st,-1,1), auto=I.z<200;
+    // position follows the song clock: cruise at 14 m/s, then brake into the spot right as the call ends (~77.6 s)
+    const CR=(1160-150)/14, A=14/((2*38)/14);
+    if(I.t<CR){ I.z=1160-14*I.t; I.speed=14; } else { const u=Math.min(I.t-CR,14/A); I.z=150-(14*u-0.5*A*u*u); I.speed=Math.max(0,14-A*u); if(I.speed<0.05){ I.speed=0; I.z=112; } }
+    I.vx+=((auto?-I.x*0.9:steer*5)-I.vx)*dt*3; I.x+=I.vx*dt;
+    if(Math.abs(I.x)>3.1){ I.x=Math.sign(I.x)*3.1; I.vx=-I.vx*0.35; if(I.t-I.bumpT>0.6){ I.bumpT=I.t; thump(0.55); noiseBurst(0.3,520,0.35,0.7); I.shake=0.4; } }   // the guardrail bumps you back
+    I.shake=Math.max(0,I.shake-dt);
+    if(CAB.wheel) CAB.wheel.rotation.z+=((auto?I.x*0.4:-steer*1.2)-CAB.wheel.rotation.z)*dt*6;
+    if(I.speed===0&&I.z<112.6){ I.phase='fade'; I.fadeT=0; $('fade').style.opacity=1; $('skiphint').style.display='none'; noiseBurst(0.15,900,0.2,1); }
+  } else { I.fadeT+=dt; if(I.fadeT>1.1) introParked(); }
+  const car=WORLD.car; car.position.set(I.x,0,I.z); car.rotation.y=Math.PI-I.vx*0.035;
+  musicAt(I.x,1,I.z);
+  player.pos.x=I.x-0.4; player.pos.z=I.z+0.25;
+  player.yaw=clamp(player.yaw,-1.3,1.3); player.pitch=clamp(player.pitch,-0.5,0.35);
+  const sh=I.shake*0.06*Math.sin(I.t*55), hum=Math.sin(I.t*11)*0.003*(I.speed/14);
+  camera.position.set(I.x-0.4,1.5+sh+hum,I.z+0.15);
+  camera.rotation.order='YXZ'; camera.rotation.y=-I.vx*0.035+player.yaw; camera.rotation.x=player.pitch; camera.rotation.z=sh*0.3;
+  zoom=1; camera.fov=BASE_FOV; camera.updateProjectionMatrix(); camera.updateMatrixWorld(true); updateListener();
+  flash.visible=false; updateLamps(dt); scene.fog.density+=(0.0105-scene.fog.density)*Math.min(1,dt*2);   // clearer on the drive so you can see the road
+}
+function introParked(){
+  const I=INTRO; I.phase='trunk'; I.x=0; I.z=112;
+  WORLD.car.position.set(0,0,112); WORLD.car.rotation.y=Math.PI; musicAt(0,1,112); music.vol=0.55/3; applyMusic(); $('titlecard').style.opacity=0;
+  if(CAB.g) CAB.g.visible=false; if(CAB.hl) CAB.hl.intensity=1.2;
+  player.pos.x=0.3; player.pos.z=116.9; player.yaw=0.05; player.pitch=-0.28; flashOn=true;
+  thump(0.4); noiseBurst(0.12,1600,0.2,1);                        // door shuts
+  setTimeout(()=>{ $('fade').style.opacity=0; },150);
+}
+function grabGear(){
+  if(INTRO.phase!=='trunk') return; INTRO.phase='done';
+  let k=0; const open=setInterval(()=>{ k++; if(CAB.lid) CAB.lid.rotation.x=Math.min(0.85,k*0.09); if(k>=11) clearInterval(open); },30);
+  if(CAB.hole) CAB.hole.visible=true; if(CAB.bag) CAB.bag.visible=true; noiseBurst(0.35,700,0.3,0.6); setTimeout(()=>{ noiseBurst(0.5,2600,0.18,2); if(CAB.bag) CAB.bag.visible=false; thump(0.3); },500);   // unzip, lift the bag
+  say('Body cam. Flashlight. Work order.',3);
+  $('order').style.display=''; setOrder();
+  later(1,checkpoint); later(2.6,()=>liam('Okay. Doggywood Park. In and out.'));
+  later(6,()=>dale('Liam? You in? Gate\'s open. Plaza\'s straight ahead. Start with the ticket booth.',6));
+}
 </script>
 </body>
 </html>
