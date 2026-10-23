@@ -1026,10 +1026,10 @@ function camThing(kind,text,w,h,x,y,z,ry,rx,store){
 function buildSigils(){
   const C=WORLD.C;
   const defs=[
-    {id:'carousel',x:C.carousel.x,z:C.carousel.z,y:0.56,r:5.5,name:'the carousel',mon:'stable'},
-    {id:'fun',x:-72.5,z:-66,y:0.05,r:3.4,name:'the funhouse',mon:'mirror'},
-    {id:'pool',x:-66,z:5,y:0.06,r:4,name:'the wave pool',mon:'lifeguard'},
-    {id:'coaster',x:C.station.x,z:C.station.z,y:1.26,r:5,name:'the coaster station',mon:'operator'},
+    {id:'carousel',x:C.carousel.x,z:C.carousel.z,y:0.56,r:5.5,name:'Carousel panel',mon:'stable'},
+    {id:'fun',x:-72.5,z:-66,y:0.05,r:3.4,name:'Funhouse panel',mon:'mirror'},
+    {id:'pool',x:-66,z:5,y:0.06,r:4,name:'Wave pool pump room',mon:'lifeguard'},
+    {id:'coaster',x:C.station.x,z:C.station.z,y:1.26,r:5,name:'Coaster station panel',mon:'operator'},
   ];
   defs.forEach(d=>{ const m=camThing('sigil','',d.id==='fun'?4.5:6,d.id==='fun'?4.5:6,d.x,d.y,d.z,0,-Math.PI/2); d.mesh=m; d.broken=false; d.hold=0; WORLD.sigils.push(d); });
   WORLD.campSigil={x:C.camp.x,z:C.camp.z,y:0.06,r:6,name:'the altar'}; WORLD.campSigil.mesh=camThing('sigil','',16,16,C.camp.x,0.06,C.camp.z,0,-Math.PI/2);
@@ -1305,8 +1305,8 @@ function setOrder(){
   if(stage===0) h='<b>WORK ORDER</b><br>Walk to the plaza. Inspect the ticket booth lighting.';
   else if(stage===1){ h='<b>SURVEY</b> (body cam: Q, click to photograph, scroll to zoom)<br>'+photoTargets.map(p=>(p.done?'[x] ':'[ ] ')+p.label).join('<br>'); }
   else if(stage===2) h='<b>WORK ORDER</b><br>Restore the main breaker.<br>Service building, east side. Follow the service lane.';
-  else if(stage===3) h='<b>THE GATE WON\'T OPEN</b><br>Break the sigils ('+sigilsBroken+'/4)<br>'+WORLD.sigils.map(s=>(s.broken?'[x] ':'[ ] ')+s.name).join('<br>')+'<br><span style="color:#8a8f9a">Look for the dogs. Hold E at a sigil.</span>';
-  else if(stage===4) h='<b>THE SERVICE GATE IS OPEN</b><br>Through the maze. North, into the woods.<br>End it at the altar.';
+  else if(stage===3) h='<b>SAFETY LOCKOUT</b><br>The main gate locked when power came back.<br>Reset the ride interlocks ('+sigilsBroken+'/4)<br>'+WORLD.sigils.map(s=>(s.broken?'[x] ':'[ ] ')+s.name).join('<br>')+'<br><span style="color:#8a8f9a">Someone has painted over each control panel. The body cam shows where. Follow the dog.</span>';
+  else if(stage===4) h='<b>LOCKOUT CLEARED</b><br>The service gate is open, not the main one.<br>Through the maze, north into the woods.<br>Last item on the work order: the old campground.';
   $('order').innerHTML=h;
 }
 
@@ -1393,7 +1393,7 @@ function sigilBroken(s){
     later(8,()=>dale('The north gate... Please. Please don\'t go through the maze.',5));
     if(hymnG) hymnG.gain.linearRampToValueAtTime(0.22,AC.currentTime+5);
   } else {
-    later(3,()=>{ if(sigilsBroken===1) dale('What did you do? What was that? Stop doing that.',5); else if(sigilsBroken===2) say('Static on the radio. Under it, someone laughing.',5); else say('Three down. The music box has slowed.',4); });
+    later(3,()=>{ if(sigilsBroken===1) dale('What did you do? What was that? Stop doing that.',5); else if(sigilsBroken===2) say('Static on the radio. Under it, someone laughing.',5); else say('Three interlocks reset. The music box has slowed.',4); });
   }
 }
 function killLamps(frac){ const on=lamps.filter(l=>l.on&&l.safe); on.sort(()=>Math.random()-0.5); on.slice(0,Math.ceil(on.length*frac)).forEach(l=>{ l.on=false; l.sp.material.opacity=0; l.bulb.material.color.set(0x15120c); l.safe=false; }); }
@@ -1581,8 +1581,8 @@ function update(dt){
   const P=$('prompt');
   let sig=null; if(stage>=3&&stage<4) sig=WORLD.sigils.find(s=>!s.broken&&Math.hypot(player.pos.x-s.x,player.pos.z-s.z)<s.r);
   if(stage===4&&Math.hypot(player.pos.x-WORLD.campSigil.x,player.pos.z-WORLD.campSigil.z)<WORLD.campSigil.r) sig=WORLD.campSigil;
-  if(near&&!ended){ P.textContent='[E] '+near.label; if(keys.KeyE){ keys.KeyE=false; near.fn(); } }
-  else if(sig&&!ended){ P.textContent=holdT>0.05?'':'[hold E] Break the sigil'; }
+  if(near&&!ended){ P.textContent='['+(pad.on?'A':'E')+'] '+near.label; if(keys.KeyE){ keys.KeyE=false; near.fn(); } }
+  else if(sig&&!ended){ P.textContent=holdT>0.05?'':'[hold '+(pad.on?'A':'E')+'] Reset the interlock'; }
   else P.textContent='';
   const need=sig===WORLD.campSigil?9:6;
   if(sig&&!ended&&keys.KeyE&&!dead){ holdT+=dt; player.noise=Math.max(player.noise,18); if(hymnG&&AC) hymnG.gain.linearRampToValueAtTime(0.14+0.12*Math.min(1,holdT/need),AC.currentTime+0.2);
