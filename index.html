@@ -2065,14 +2065,15 @@ const mistTex=(()=>{ const c=document.createElement('canvas'); c.width=c.height=
   g.fillStyle=r; g.fillRect(0,0,128,128); return new THREE.CanvasTexture(c); })();
 const MIST=[];
 (()=>{ const spots=[];
-  for(let i=0;i<26;i++) spots.push([-30+Math.random()*60, 70+Math.random()*55]);          // parking lot / road to the car
+  for(let i=0;i<26;i++){ let x,z; do{ x=-30+Math.random()*60; z=70+Math.random()*55; }while(Math.hypot(x-2.5,z-106)<14); spots.push([x,z]); }   // parking lot / road to the car (not on top of you at the start)
   for(let i=0;i<26;i++) spots.push([-110+Math.random()*220, -150-Math.random()*45]);      // the woods to the north
   for(let i=0;i<22;i++){ const sd=Math.random()<0.5?-1:1; spots.push([sd*(112+Math.random()*25), -140+Math.random()*190]); }   // along the fences
   for(let i=0;i<18;i++) spots.push([-100+Math.random()*200, -130+Math.random()*180]);     // a few wisps inside
-  spots.forEach(([x,z])=>{ const m=new THREE.Sprite(new THREE.SpriteMaterial({map:mistTex,transparent:true,depthWrite:false,opacity:0.16+Math.random()*0.14,color:0xb8c2cc}));
+  spots.forEach(([x,z])=>{ const m=new THREE.Sprite(new THREE.SpriteMaterial({map:mistTex,transparent:true,depthWrite:false,opacity:0,color:0xa9b3bd})); m.userData.op=0.12+Math.random()*0.1;
     const sc=10+Math.random()*14; m.scale.set(sc,sc*0.35,1); m.position.set(x,0.8+Math.random()*1.2,z); m.userData={vx:(Math.random()-0.5)*0.5,vz:(Math.random()-0.5)*0.5,ph:Math.random()*6};
     scene.add(m); MIST.push(m); }); })();
-setInterval(()=>{ if(paused) return; MIST.forEach(m=>{ m.position.x+=m.userData.vx*0.1; m.position.z+=m.userData.vz*0.1; m.material.rotation=Math.sin(tNow*0.1+m.userData.ph)*0.2; }); },100);
+setInterval(()=>{ if(paused) return; MIST.forEach(m=>{ m.position.x+=m.userData.vx*0.1; m.position.z+=m.userData.vz*0.1; m.material.rotation=Math.sin(tNow*0.1+m.userData.ph)*0.2;
+  const d=camera.position.distanceTo(m.position); m.material.opacity=m.userData.op*clamp((d-5)/12,0,1); }); },100);   // fades as you walk into it, so it never fills the screen
 
 // ---------- monsters scramble your camera as they get close ----------
 let FUZZ=0, fuzzHiss=null;
