@@ -82,7 +82,7 @@
 <div id="refs" style="position:fixed;inset:0;display:none;align-items:center;justify-content:center;background:rgba(0,0,0,.85);z-index:10;color:#ffd35a;font-size:28px;cursor:pointer">[ press A to go back to full screen ]</div>
 <div id="sigloss"><div class="snow"></div><p>SIGNAL LOST</p></div>
 <div id="death"><h1 style="color:#c22;letter-spacing:.3em">YOU DIED</h1><p id="dmsg"></p><p class="opt" id="dcont">&#9654; Continue from checkpoint <span class="k2" id="dkey">[R]</span></p><p style="color:#8a8070;font-size:13px">Pause menu: <span id="dmkey">Esc</span></p></div>
-<div id="menu"><div class="box"><h2>PAUSED</h2><div id="mitems"></div><div id="mhelp"></div><p class="hint" id="mhint"></p></div></div>
+<div id="menu"><div class="box"><h2>PAUSED</h2><div id="mitems"></div><div id="mhelp"></div><p class="hint" id="mdiag" style="color:#9aa"></p><p class="hint" id="mhint"></p></div></div>
 <div id="end"><h1>&mdash;</h1><p id="emsg"></p></div>
 
 <script>/**
@@ -145,8 +145,9 @@ function resize(){
   renderer.setSize(w,h,false);
   camera.aspect=w/h; camera.updateProjectionMatrix();
 }
-canvas.addEventListener('webglcontextlost',e=>{ e.preventDefault(); },false);
-canvas.addEventListener('webglcontextrestored',()=>{ POST.rt=null; resize(); },false);
+let GL_LOST=0, GL_RESTORED=0;
+canvas.addEventListener('webglcontextlost',e=>{ e.preventDefault(); GL_LOST++; try{ reportErr(new Error('graphics context lost'),'gpu'); }catch(x){} },false);
+canvas.addEventListener('webglcontextrestored',()=>{ GL_RESTORED++; POST.rt=null; resize(); },false);
 addEventListener('resize',resize); resize();
 
 const amb=new THREE.AmbientLight(0x3a4668,0.95); scene.add(amb);
@@ -2072,7 +2073,9 @@ function drawMenu(){
     ?'Left stick: move &nbsp; Right stick: look<br>A: interact (hold)<br>Y: night-vision camera &nbsp; RT: photo &nbsp; D-pad: zoom<br>LB: sprint (loud) &nbsp; B: crouch (quiet) &nbsp; RB: pause'
     :'WASD: move &nbsp; Mouse: look<br>E: interact (hold)<br>Q: night-vision camera &nbsp; Click: photo &nbsp; Scroll: zoom<br>Shift: sprint (loud) &nbsp; C: crouch (quiet)';
 }
-function openMenu(){ if(paused||!started||dead||ended) return; paused=true; menuSel=0; $('mhelp').style.display='none'; drawMenu(); $('menu').style.display='flex'; try{document.exitPointerLock();}catch(e){} if(AC&&AC.state==='running') AC.suspend(); }
+function diagLine(){ const c=camera.position, f=n=>Number.isFinite(n)?(+n.toFixed(2)):String(n); const sz=renderer.getSize(new THREE.Vector2()); let gl='?'; try{ gl=renderer.getContext().isContextLost()?'LOST':'ok'; }catch(x){}
+  return 'diag  pos '+f(c.x)+','+f(c.y)+','+f(c.z)+'  yaw '+f(player.yaw)+' pitch '+f(player.pitch)+'  fov '+f(camera.fov)+' zoom '+f(zoom)+'  fog '+f(scene.fog.density)+'  size '+sz.x+'x'+sz.y+' rows '+POST.rows+'  gl '+gl+' lost '+GL_LOST+'/'+GL_RESTORED+'  cam '+camOn+'  fuzz '+f(POST.fuzz)+'  intro '+INTRO.phase+'  stage '+stage; }
+function openMenu(){ if(paused||!started||dead||ended) return; paused=true; try{ $('mdiag').textContent=diagLine(); }catch(x){ $('mdiag').textContent='diag failed: '+x.message; } menuSel=0; $('mhelp').style.display='none'; drawMenu(); $('menu').style.display='flex'; try{document.exitPointerLock();}catch(e){} if(AC&&AC.state==='running') AC.suspend(); }
 function closeMenu(){ if(!paused) return; paused=false; $('menu').style.display='none'; if(AC&&AC.state==='suspended') AC.resume(); try{ const r=canvas.requestPointerLock(); if(r&&r.catch) r.catch(()=>{}); }catch(e){} }
 function menuMove(d){ menuSel=(menuSel+d+MENU.length)%MENU.length; blip(700,0.03,'square',0.03); drawMenu(); }
 function menuAdj(d){ const m=MENU[menuSel]; if(m.adj){ m.adj(d); drawMenu(); } }
